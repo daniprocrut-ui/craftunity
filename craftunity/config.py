@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Craftunity"
-LAUNCHER_VERSION = "1.2.5"
+LAUNCHER_VERSION = "1.2.6"
 
 GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"
@@ -17,7 +17,7 @@ MANIFEST_FALLBACKS: list[str] = [
     "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json",
     "https://cdn.jsdelivr.net/gh/daniprocrut-ui/craftunity@main/docs/manifest.json",
 ]
-DEFAULT_SERVER_HOST = "craftunity.mcsh.io"
+DEFAULT_SERVER_HOST = "craftunity3.mcsh.io"
 DEFAULT_SERVER_PORT = 25565
 DEFAULT_GAME_VERSION = "1.20.1"
 DEFAULT_LOADER = "fabric"

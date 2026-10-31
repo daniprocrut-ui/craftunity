@@ -254,7 +254,7 @@
     <header>
       <div class="brand">Craftunity</div>
       <h1>Клиент Craftunity</h1>
-      <p class="lead">Собственный лаунчер для сервера craftunity.mcsh.io. Один файл без установки: скачал и запустил.</p>
+      <p class="lead">Собственный лаунчер для сервера craftunity3.mcsh.io. Один файл без установки: скачал и запустил.</p>
     </header>
 
     <section class="card">
@@ -289,7 +289,7 @@
     <section class="card">
       <h2>Сервер</h2>
       <div class="server">
-        <code>craftunity.mcsh.io:25565</code>
+        <code id="server-addr">craftunity3.mcsh.io:25565</code>
         <button id="copy-btn" class="btn secondary" type="button">Скопировать адрес</button>
       </div>
       <div id="copy-status" class="copied"></div>
@@ -299,7 +299,7 @@
     </section>
 
     <footer>
-      <span id="server-footer">craftunity.mcsh.io</span>
+      <span id="server-footer">craftunity3.mcsh.io</span>
     </footer>
   </div>
 
@@ -365,6 +365,15 @@ function applyManifest(m) {
     setMandatory(m.launcher.mandatory);
   }
 
+  if (m.server && typeof m.server.host === "string" && m.server.host) {
+    var port = m.server.port ? String(m.server.port) : "";
+    SERVER_ADDR = port ? m.server.host + ":" + port : m.server.host;
+    var addrNode = document.getElementById("server-addr");
+    if (addrNode) addrNode.textContent = SERVER_ADDR;
+    var footNode = document.getElementById("server-footer");
+    if (footNode) footNode.textContent = m.server.host;
+  }
+
   if (m.launcher && typeof m.launcher.url === "string" && m.launcher.url) {
     downloadBtn.href = m.launcher.url;
   } else {
@@ -384,7 +393,7 @@ fetch(MANIFEST_URL, { cache: "no-store" })
     downloadBtn.href = RELEASES_URL;
   });
 
-var SERVER_ADDR = "craftunity.mcsh.io:25565";
+var SERVER_ADDR = "craftunity3.mcsh.io:25565";
 
 function fallbackCopy(text) {
   var ta = document.createElement("textarea");
