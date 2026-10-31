@@ -6,12 +6,12 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Craftunity"
-LAUNCHER_VERSION = "1.2.4"
+LAUNCHER_VERSION = "1.2.5"
 
 GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"
 MANIFEST_REFRESH_SECONDS = 60
-HEARTBEAT_URL = ""
+HEARTBEAT_URL = "https://craftunity-heartbeat.netlify.app"
 LEGACY_MANIFEST_URLS = ("https://craftunity.mcsh.io/launcher/manifest.json",)
 MANIFEST_FALLBACKS: list[str] = [
     "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json",
