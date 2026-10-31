@@ -1,4 +1,4 @@
-# Craftunity Launcher
+﻿# Craftunity Launcher
 
 Лаунчер Minecraft для сервера **craftunity.mcsh.io** и отдельная лёгкая админ-панель.
 Клиент — `Craftunity_launcher.exe`, панель — `Admin.exe` (нативное окно, без браузера и WebView).
@@ -17,7 +17,7 @@
 | Автовход на сервер | `--quickPlayMultiplayer craftunity.mcsh.io:25565` |
 | Heartbeat | клиент сообщает админке свою версию и ник |
 | Автообновление | новый exe берётся из подписанного манифеста, проверяется по sha256 и подменяется при следующем запуске |
-| Сайт загрузки | статическая страница `site/index.html` для GitHub Pages, файлы — в GitHub Releases |
+| Сайт загрузки | статическая страница `docs/index.html` для GitHub Pages, файлы — в GitHub Releases |
 
 ## Быстрый старт
 
@@ -60,7 +60,7 @@ python tests\updater_check.py  # проверка логики обновлен�
 1. Админ задаёт параметры сборки и публикует манифест.
 2. Манифест подписывается приватным ключом `%APPDATA%\Craftunity\admin\manifest_private.pem`.
 3. Публикуются два файла: `manifest.json` и `manifest.json.sig` (папка `%APPDATA%\Craftunity\admin\publish`),
-   а `tools\release.py` кладёт их в `site/` и вместе с exe отправляет на GitHub.
+   а `tools\release.py` кладёт их в `docs/` и вместе с exe отправляет на GitHub.
 4. Лаунчер скачивает их с GitHub Pages, проверяет подпись встроенным публичным ключом
    (`keys\craftunity_manifest_pub.pem`) и только потом ставит клиент и модпак.
 
@@ -169,19 +169,19 @@ python tools\release.py 1.1.0 --notes "Что нового" --repo <user>/<repo>
 Скрипт прописывает в `craftunity/config.py` адрес манифеста на GitHub Pages, зеркала
 (`MANIFEST_FALLBACKS`) и `GITHUB_REPO`, поднимает `LAUNCHER_VERSION`, собирает `Craftunity_launcher.spec`,
 считает sha256, заливает exe в GitHub Releases (`gh release create`), вписывает блок `launcher`
-в манифест, подписывает его, копирует `manifest.json` и `.sig` в `site/`, обновляет ссылку на
-релизы в `site/index.html` и коммитит изменения. `--dry-run` показывает план без изменений,
+в манифест, подписывает его, копирует `manifest.json` и `.sig` в `docs/`, обновляет ссылку на
+релизы в `docs/index.html` и коммитит изменения. `--dry-run` показывает план без изменений,
 `--no-upload` и `--skip-build` — для отладки, `--no-commit` — если коммит нужен вручную.
 
 Первая настройка хостинга:
 
 1. Создать репозиторий на GitHub и подключить его как `origin` (`gh auth login` для загрузки релизов).
-2. Settings → Pages → Source: ветка `main`, папка `/site`.
+2. Settings → Pages → Source: ветка `main`, папка `/docs`.
 3. Прописать в лаунчере (или в `craftunity.json`) адрес `https://<user>.github.io/<repo>/manifest.json`.
 4. `keys\craftunity_manifest_pub.pem` в сборке должен совпадать с публичным ключом
    из `%APPDATA%\Craftunity\admin\`, иначе клиенты отклонят манифест.
 
-Страница `site/index.html` читает `./manifest.json` рядом с собой и подставляет версию,
+Страница `docs/index.html` читает `./manifest.json` рядом с собой и подставляет версию,
 дату, «что нового» и ссылку на скачивание. Если манифеста нет, страница остаётся рабочей
 и ведёт на страницу релизов.
 

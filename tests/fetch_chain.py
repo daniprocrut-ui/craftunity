@@ -93,7 +93,7 @@ def main() -> int:
         values["DEFAULT_MANIFEST_URL"],
     )
     check("два зеркала", len(values["MANIFEST_FALLBACKS"]) == 2, str(values["MANIFEST_FALLBACKS"]))
-    check("json-зеркало на jsDelivr", "cdn.jsdelivr.net/gh/someone/craftunity@main/site/manifest.json" in values["MANIFEST_FALLBACKS"][0])
+    check("json-зеркало на jsDelivr", "cdn.jsdelivr.net/gh/someone/craftunity@main/docs/manifest.json" in values["MANIFEST_FALLBACKS"][0])
     check("legacy-адрес остался в истории", values["LEGACY_MANIFEST_URLS"][0] == "https://craftunity.mcsh.io/launcher/manifest.json")
 
     print()

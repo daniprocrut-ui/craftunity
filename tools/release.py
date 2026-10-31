@@ -15,7 +15,7 @@ from craftunity import config, manifest  # noqa: E402
 
 CONFIG_PATH = ROOT / "craftunity" / "config.py"
 DIST_EXE = ROOT / "dist" / "Craftunity_launcher.exe"
-SITE_DIR = ROOT / "site"
+SITE_DIR = ROOT / "docs"
 ASSET_NAME = "Craftunity_launcher.exe"
 
 
@@ -73,8 +73,8 @@ def set_source_constants(repo: str) -> None:
     """Прописывает в config.py адрес манифеста на GitHub Pages и зеркала."""
     url = pages_manifest_url(repo)
     fallbacks = [
-        f"https://cdn.jsdelivr.net/gh/{repo}@main/site/manifest.json",
-        f"https://raw.githubusercontent.com/{repo}/main/site/manifest.json",
+        f"https://cdn.jsdelivr.net/gh/{repo}@main/docs/manifest.json",
+        f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json",
     ]
     text = CONFIG_PATH.read_text(encoding="utf-8")
     text = re.sub(r'GITHUB_REPO = "[^"]*"', f'GITHUB_REPO = "{repo}"', text, count=1)
@@ -105,7 +105,7 @@ def sync_site_links(repo: str) -> None:
     )
     if updated != text:
         page.write_text(updated, encoding="utf-8")
-        print(f"site/index.html: ссылка на релизы → github.com/{repo}/releases")
+        print(f"docs/index.html: ссылка на релизы → github.com/{repo}/releases")
 
 
 def build() -> None:
@@ -161,12 +161,12 @@ def publish_manifest(version: str, url: str, digest: str, notes: str, mandatory:
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     for name in ("manifest.json", "manifest.json.sig"):
         shutil.copy2(publish / name, SITE_DIR / name)
-        print(f"→ site/{name}")
+        print(f"→ docs/{name}")
     return SITE_DIR / "manifest.json"
 
 
 def commit_and_push(version: str, push: bool) -> None:
-    files = ["craftunity/config.py", "site/index.html", "site/manifest.json", "site/manifest.json.sig", "README.md"]
+    files = ["craftunity/config.py", "docs/index.html", "docs/manifest.json", "docs/manifest.json.sig", "README.md"]
     existing = [name for name in files if (ROOT / name).exists()]
     run(["git", "add", *existing], cwd=ROOT)
     run(["git", "commit", "-m", f"release: Craftunity Launcher {version}"], cwd=ROOT)
@@ -185,7 +185,7 @@ def main() -> int:
     parser.add_argument("--mandatory", action="store_true", help="Обновление обязательное: старые версии не запустятся")
     parser.add_argument("--skip-build", action="store_true", help="Не собирать exe, взять готовый из dist")
     parser.add_argument("--no-upload", action="store_true", help="Не заливать в GitHub Releases (ссылка всё равно попадёт в манифест)")
-    parser.add_argument("--no-commit", action="store_true", help="Не коммитить site/ и config.py")
+    parser.add_argument("--no-commit", action="store_true", help="Не коммитить docs/ и config.py")
     parser.add_argument("--push", action="store_true", help="Запушить коммит сразу")
     parser.add_argument("--dry-run", action="store_true", help="Только показать план, ничего не менять")
     args = parser.parse_args()
