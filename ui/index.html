@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Craftunity Launcher</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div class="brand-text"><b>CRAFTUNITY</b><span>LAUNCHER</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="play" class="active"><span class="ico">▶</span>Играть</button>
+      <button data-view="mods"><span class="ico">◈</span>Контент</button>
+      <button data-view="installed"><span class="ico">▣</span>Установлено</button>
+      <button data-view="files"><span class="ico">▤</span>Файлы</button>
+      <button data-view="skin"><span class="ico">☻</span>Скин</button>
+      <button data-view="account"><span class="ico">◉</span>Аккаунт</button>
+      <button data-view="settings"><span class="ico">⚙</span>Настройки</button>
+    </nav>
+    <div class="side-foot">
+      <div><span class="dot" id="netDot"></span><span id="netText">Проверка сети…</span></div>
+      <div style="margin-top:6px">Версия лаунчера <span id="launcherVer">—</span></div>
+      <div>craftunity.mcsh.io</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="viewTitle">Играть</h1>
+        <div class="sub" id="viewSub">Craftunity — один клиент, один сервер</div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center">
+        <button class="btn ghost small" id="themeToggle" title="Переключить тему">Тёмная</button>
+        <div class="pill" id="serverPill"><span>Сервер</span><b>—</b></div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- ИГРАТЬ -->
+      <section class="view active" id="view-play">
+        <div class="grid two">
+          <div class="card">
+            <div class="hero">
+              <div class="avatar-wrap"><canvas id="avatarCanvas" width="8" height="8"></canvas></div>
+              <div class="hero-info">
+                <div class="name" id="heroName">Гость</div>
+                <div class="type" id="heroType">Аккаунт не выбран</div>
+                <div class="chips" id="heroChips"></div>
+              </div>
+            </div>
+            <div class="play-row">
+              <button class="btn primary" id="playBtn" disabled>Играть</button>
+              <button class="btn ghost small" id="stopBtn" style="display:none">Остановить</button>
+              <span class="hint" id="playHint">Выберите аккаунт, чтобы начать</span>
+            </div>
+            <div class="hint" id="manifestWarn" style="display:none; margin-top:16px; padding:12px 14px; border:1px solid rgba(255,193,7,.4); border-radius:12px; background:rgba(255,193,7,.06); color:#e8d9b0"></div>
+            <div class="progress" id="progress">
+              <div class="bar"><i id="progressBar"></i></div>
+              <div class="meta"><span id="progressStage">—</span><span id="progressPct">0%</span></div>
+            </div>
+            <div class="actions" style="margin-top:16px">
+              <button class="btn ghost small" id="logToggle">Показать лог</button>
+              <button class="btn ghost small" id="checkBtn">Проверить файлы</button>
+            </div>
+            <div class="log" id="logBox"></div>
+          </div>
+
+          <div class="grid" style="align-content:start">
+            <div class="card">
+              <h3>Сервер</h3>
+              <div class="hint" id="serverCard">Загрузка манифеста…</div>
+              <div class="actions" style="margin-top:14px">
+                <button class="btn small" onclick="copyServer()">Скопировать IP</button>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Состояние клиента</h3>
+              <div class="list" id="clientState"><div class="empty">Нет данных</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- МОДЫ -->
+      <section class="view" id="view-mods">
+        <div class="card" style="margin-bottom:18px">
+          <h3 id="contentTitle">Установка модов</h3>
+          <div class="hint" id="contentHint">Моды берутся из каталога Modrinth и ставятся в папку <code>mods</code> выбранной версии.</div>
+          <div class="tabs" id="contentTabs" style="margin-top:14px">
+            <button data-kind="mod" class="active">Моды</button>
+            <button data-kind="resourcepack">Ресурспаки</button>
+            <button data-kind="shader">Шейдеры</button>
+          </div>
+          <div class="mods-toolbar">
+            <input type="text" id="modQuery" placeholder="Название мода, например Sodium или JEI">
+            <select id="modSort" style="flex:none; width:180px">
+              <option value="relevance">По релевантности</option>
+              <option value="downloads">По загрузкам</option>
+              <option value="newest">Новые</option>
+              <option value="updated">Обновлённые</option>
+            </select>
+            <button class="btn" id="modSearchBtn" style="flex:none">Найти</button>
+            <button class="btn ghost" id="uploadPack" style="flex:none" title="Добавить свой .zip в ресурспаки или шейдеры">Добавить .zip</button>
+            <input type="file" id="packFile" accept=".zip" style="display:none">
+          </div>
+          <div class="hint" id="modFilter"></div>
+        </div>
+        <div class="mods-grid" id="modResults"></div>
+        <div class="actions" id="modMoreWrap" style="display:none; justify-content:center; margin-top:16px">
+          <button class="btn" id="modMore">Показать ещё</button>
+        </div>
+      </section>
+
+      <!-- УСТАНОВЛЕНО -->
+      <section class="view" id="view-installed">
+        <div class="tabs" id="installedTabs" style="margin-bottom:16px">
+          <button data-filter="all" class="active">Всё</button>
+          <button data-filter="mod">Моды</button>
+          <button data-filter="resourcepack">Ресурспаки</button>
+          <button data-filter="shader">Шейдеры</button>
+        </div>
+        <div class="hint" id="installedHint" style="margin-bottom:12px">Здесь всё, что установлено через лаунчер или положено вручную.</div>
+        <div class="list" id="installedMods"><div class="empty">Пока ничего не установлено</div></div>
+      </section>
+
+      <!-- ФАЙЛЫ -->
+      <section class="view" id="view-files">
+        <div class="grid two">
+          <div class="card">
+            <h3>Игровые файлы</h3>
+            <div class="hint">Киньте конфиги, настройки, миры или другие файлы — они попадут в папку игры. Лаунчер их не трогает.</div>
+            <div class="field" style="margin-top:16px">
+              <label>Куда положить</label>
+              <select id="fileDest">
+                <option value="game">Корень игры</option>
+                <option value="config">config</option>
+                <option value="mods">mods</option>
+                <option value="resourcepacks">resourcepacks</option>
+                <option value="shaderpacks">shaderpacks</option>
+                <option value="saves">saves</option>
+              </select>
+            </div>
+            <div class="drop" id="fileDrop">
+              Перетащите файлы сюда<br><span style="font-size:11.5px">или нажмите, чтобы выбрать</span>
+            </div>
+            <input type="file" id="fileInput" multiple style="display:none">
+            <div class="actions" style="margin-top:12px">
+              <button class="btn ghost small" onclick="openFolder('game')">Открыть папку игры</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>В выбранной папке</h3>
+            <div class="hint" id="fileDestHint">—</div>
+            <div class="list" id="fileList" style="margin-top:12px"><div class="empty">Пусто</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- СКИН -->
+      <section class="view" id="view-skin">
+        <div class="grid two">
+          <div class="card">
+            <h3>Ваш скин</h3>
+            <div class="hint">PNG 64×64 (или 64×32). Для отображения на сервере нужен плагин скинов или аккаунт ely.by.</div>
+            <div class="skin-stage" style="margin-top:18px">
+              <div class="skin-canvas-wrap"><canvas id="skinCanvas" width="260" height="340"></canvas></div>
+              <div style="flex:1; min-width:220px">
+                <div class="field">
+                  <label>Модель</label>
+                  <select id="skinModel"><option value="classic">Classic (Steve)</option><option value="slim">Slim (Alex)</option></select>
+                </div>
+                <div class="drop" id="skinDrop">Перетащите PNG сюда<br><span style="font-size:11.5px">или нажмите, чтобы выбрать файл</span></div>
+                <input type="file" id="skinFile" accept="image/png" style="display:none">
+                <div class="actions" style="margin-top:14px">
+                  <button class="btn small" id="skinApply">Применить локально</button>
+                  <button class="btn small" id="skinUploadEly">Скин на ely.by</button>
+                </div>
+                <div class="hint" style="margin-top:12px" id="skinHint">
+                  Скин ещё не загружен. Скин для аккаунта ely.by меняется на сайте — откроется account.ely.by/skins.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Где применяется скин</h3>
+            <div class="hint">
+              Локальный скин хранится в папке лаунчера и виден вам. На сервере Craftunity скин показывается,
+              если вы вошли через ely.by или администратор включил серверный плагин скинов.
+            </div>
+            <div class="actions" style="margin-top:16px">
+              <button class="btn ghost small" onclick="openFolder('data')">Открыть папку данных</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- АККАУНТ -->
+      <section class="view" id="view-account">
+        <div class="grid two">
+          <div class="card">
+            <h3>Оффлайн-аккаунт</h3>
+            <div class="hint">Ник для игры без авторизации. Подходит для серверов с режимом online-mode=false.</div>
+            <div class="field" style="margin-top:16px">
+              <label>Ник (3–16 символов)</label>
+              <input type="text" id="offlineName" maxlength="16" placeholder="Steve">
+            </div>
+            <button class="btn" id="offlineBtn">Играть оффлайн</button>
+          </div>
+          <div class="card">
+            <h3>Аккаунт ely.by</h3>
+            <div class="hint">Вход в аккаунт ely.by: скины, плащи и авторизация на сервере через authlib-injector.</div>
+            <div class="field" style="margin-top:16px">
+              <label>Логин или e-mail</label>
+              <input type="text" id="elyLogin" autocomplete="username">
+            </div>
+            <div class="field">
+              <label>Пароль</label>
+              <input type="password" id="elyPassword" autocomplete="current-password">
+            </div>
+            <div class="actions">
+              <button class="btn primary" id="elyBtn">Войти через ely.by</button>
+              <button class="btn ghost small" id="elyRegister">Регистрация на ely.by</button>
+              <button class="btn ghost small" id="logoutBtn">Выйти</button>
+            </div>
+            <div class="hint" id="elyHint" style="margin-top:12px">
+              Аккаунт создаётся на account.ely.by. Логин — ник ely.by или e-mail, пароль — от ely.by.
+              Пароль передаётся напрямую на authserver.ely.by и не сохраняется.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- НАСТРОЙКИ -->
+      <section class="view" id="view-settings">
+        <div class="card" style="margin-bottom:18px">
+          <h3>Внешний вид</h3>
+          <div class="hint">Тема применяется сразу и сохраняется в настройках лаунчера.</div>
+          <div class="tabs" id="themeTiles" style="margin-top:14px">
+            <button data-theme="dark">Тёмная</button>
+            <button data-theme="light">Светлая</button>
+            <button data-theme="midnight">Полуночная</button>
+            <button data-theme="forest">Лесная</button>
+            <button data-theme="sunset">Закатная</button>
+            <button data-theme="ocean">Океанская</button>
+            <button data-theme="sakura">Сакура</button>
+            <button data-theme="neon">Неоновая</button>
+            <button data-theme="graphite">Графитовая</button>
+            <button data-theme="crimson">Багровая</button>
+            <button data-theme="coffee">Кофейная</button>
+            <button data-theme="sand">Песочная</button>
+            <button data-theme="lavender">Лавандовая</button>
+            <button data-theme="arctic">Арктическая</button>
+          </div>
+          <div class="field" style="margin-top:14px">
+            <label>Вид каталога и установленного</label>
+            <div class="tabs" id="contentViewModes" style="margin-bottom:0">
+              <button data-content-view="tiles">Плитка</button>
+              <button data-content-view="list">Список</button>
+            </div>
+          </div>
+          <div class="list" style="gap:8px">
+            <label class="list-item" style="cursor:pointer">
+              <input type="checkbox" id="optReduceMotion" style="width:18px;height:18px;accent-color:var(--accent)">
+              <div class="grow"><div class="name">Уменьшить анимации</div></div>
+            </label>
+            <label class="list-item" style="cursor:pointer">
+              <input type="checkbox" id="optAutoJava" style="width:18px;height:18px;accent-color:var(--accent)">
+              <div class="grow"><div class="name">Автоматически скачивать Java</div><div class="meta">Если подходящая Java не найдена</div></div>
+            </label>
+            <label class="list-item" style="cursor:pointer">
+              <input type="checkbox" id="optAutoJoin" style="width:18px;height:18px;accent-color:var(--accent)">
+              <div class="grow"><div class="name">Автовход на сервер</div><div class="meta">Подключаться к craftunity.mcsh.io при запуске</div></div>
+            </label>
+          </div>
+        </div>
+        <div class="grid two">
+          <div class="card">
+            <h3>Игра</h3>
+            <div class="row" style="margin-top:16px">
+              <div class="field"><label>Память (МБ)</label><input type="number" id="setMemory" min="1024" max="16384" step="512"></div>
+              <div class="field"><label>Java</label><input type="text" id="setJava" placeholder="Автоопределение"></div>
+            </div>
+            <div class="field">
+              <label>Версия клиента (управляется админ-панелью)</label>
+              <input type="text" id="setVersion" readonly>
+            </div>
+            <div class="field">
+              <label>Адрес сервера</label>
+              <input type="text" id="setServer" readonly>
+            </div>
+            <div class="actions">
+              <button class="btn primary" id="saveSettings">Сохранить</button>
+              <button class="btn ghost small" onclick="openFolder('game')">Папка игры</button>
+              <button class="btn ghost small" onclick="openFolder('logs')">Логи</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Манифест и обновления</h3>
+            <div class="hint">Адрес находится автоматически: маяк админ-панели в локальной сети, затем сохранённая копия. Вводить ничего не нужно.</div>
+            <div class="field" style="margin-top:16px">
+              <label>Источник манифеста</label>
+              <div class="hint" id="manifestAuto">Определяю автоматически…</div>
+            </div>
+            <div class="actions">
+              <button class="btn" id="refreshManifest">Обновить манифест</button>
+            </div>
+            <div class="hint" id="manifestInfo" style="margin-top:14px">—</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="statusbar">
+      <span class="grow" id="statusText">Готово</span>
+      <span id="statusVersion">—</span>
+    </div>
+  </div>
+</div>
+<div class="modal" id="projectModal">
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose" title="Закрыть">×</button>
+    <div id="modalBody"><div class="empty"><span class="spinner"></span> Загружаю страницу…</div></div>
+  </div>
+</div>
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose" title="Закрыть">×</button>
+  <button class="lb-nav lb-prev" id="lbPrev" title="Предыдущий">‹</button>
+  <img id="lbImage" alt="">
+  <button class="lb-nav lb-next" id="lbNext" title="Следующий">›</button>
+  <div class="lb-tools">
+    <button class="btn small ghost" id="lbZoomOut">−</button>
+    <span id="lbCounter">1 / 1</span>
+    <button class="btn small ghost" id="lbZoomIn">+</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

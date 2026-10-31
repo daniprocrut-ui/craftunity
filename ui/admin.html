@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Craftunity — админ-панель</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="admin-shell">
+  <div class="admin-head">
+    <div>
+      <h1>Craftunity Admin</h1>
+      <div class="hint">Одна версия клиента для всех лаунчеров: манифест, модпак и список подключённых клиентов.</div>
+    </div>
+    <div class="actions">
+      <a class="btn ghost small" href="/api/manifest.json" target="_blank">Открыть манифест</a>
+      <button class="btn small" id="logoutBtn">Выйти</button>
+    </div>
+  </div>
+
+  <div class="admin-grid">
+    <div class="card">
+      <h3>Сборка клиента</h3>
+      <div class="hint">Изменения применяются у всех лаунчеров после публикации и перезапуска игры.</div>
+      <div class="row" style="margin-top:16px">
+        <div class="field"><label>Версия сборки</label><input type="text" id="mVersion"></div>
+        <div class="field"><label>Версия Minecraft</label><input type="text" id="mGame"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Загрузчик</label>
+          <select id="mLoader"><option value="fabric">Fabric</option><option value="vanilla">Vanilla</option></select>
+        </div>
+        <div class="field"><label>Версия загрузчика (пусто = авто)</label><input type="text" id="mLoaderVersion"></div>
+      </div>
+      <div class="field"><label>Сообщение игрокам</label><textarea id="mMessage"></textarea></div>
+      <div class="row">
+        <div class="field"><label>Хост сервера</label><input type="text" id="mHost"></div>
+        <div class="field"><label>Порт</label><input type="number" id="mPort" min="1" max="65535"></div>
+      </div>
+      <div class="field"><label>JVM-аргументы</label><textarea id="mJvm" placeholder="-Xmx4G -XX:+UseG1GC"></textarea></div>
+      <div class="actions">
+        <button class="btn primary" id="saveBtn">Сохранить и опубликовать</button>
+        <button class="btn ghost small" id="reloadBtn">Перечитать</button>
+      </div>
+      <div class="hint" id="saveHint" style="margin-top:12px">—</div>
+    </div>
+
+    <div class="card">
+      <h3>Модпак</h3>
+      <div class="hint">Моды из Modrinth, которые лаунчер поставит автоматически (project_id или slug).</div>
+      <div class="row" style="margin-top:14px">
+        <div class="field"><label>Project ID или slug</label><input type="text" id="modId" placeholder="sodium"></div>
+        <div class="field"><label>Название (необязательно)</label><input type="text" id="modTitle"></div>
+      </div>
+      <div class="actions">
+        <button class="btn small" id="addModBtn">Добавить в модпак</button>
+      </div>
+      <div class="list" id="modList" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>Подключённые клиенты</h3>
+    <div class="hint">Лаунчеры отправляют heartbeat при запуске игры.</div>
+    <div style="overflow-x:auto;margin-top:12px">
+      <table>
+        <thead><tr><th>Клиент</th><th>Игрок</th><th>Версия</th><th>Последняя активность</th></tr></thead>
+        <tbody id="clientsBody"><tr><td colspan="4" class="empty">Пока нет данных</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>Ключ подписи</h3>
+    <div class="hint">
+      Манифест подписывается приватным ключом <code>%APPDATA%\Craftunity\admin\manifest_private.pem</code>,
+      в лаунчере хранится только публичный ключ. Перенесите публичный ключ
+      <code>craftunity_manifest_pub.pem</code> в сборку лаунчера перед раздачей игрокам.
+    </div>
+    <div class="hint" id="keyInfo" style="margin-top:10px">—</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/static/admin.js"></script>
+</body>
+</html>

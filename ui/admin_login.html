@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Craftunity — вход в админ-панель</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <h3>Craftunity Admin</h3>
+    <div class="hint">Панель управления версией лаунчера, модпаком и списком клиентов.</div>
+    <div class="field" style="margin-top:18px">
+      <label>Пароль администратора</label>
+      <input type="password" id="password" autofocus>
+    </div>
+    <button class="btn primary" id="loginBtn" style="width:100%">Войти</button>
+    <div class="hint" id="loginHint" style="margin-top:12px">Пароль задаётся переменной CRAFTUNITY_ADMIN_PASSWORD.</div>
+  </div>
+</div>
+<script>
+async function login() {
+  const hint = document.getElementById('loginHint');
+  try {
+    const response = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: document.getElementById('password').value })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      hint.textContent = data.error || 'Неверный пароль';
+      return;
+    }
+    location.href = '/admin';
+  } catch (err) {
+    hint.textContent = 'Ошибка: ' + err.message;
+  }
+}
+document.getElementById('loginBtn').addEventListener('click', login);
+document.getElementById('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+</script>
+</body>
+</html>
