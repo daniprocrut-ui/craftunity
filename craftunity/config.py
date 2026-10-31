@@ -6,14 +6,14 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Craftunity"
-LAUNCHER_VERSION = "1.2.0"
+LAUNCHER_VERSION = "1.2.1"
 
 GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"
 LEGACY_MANIFEST_URLS = ("https://craftunity.mcsh.io/launcher/manifest.json",)
 MANIFEST_FALLBACKS: list[str] = [
-    "https://cdn.jsdelivr.net/gh/daniprocrut-ui/craftunity@main/docs/manifest.json",
     "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json",
+    "https://cdn.jsdelivr.net/gh/daniprocrut-ui/craftunity@main/docs/manifest.json",
 ]
 DEFAULT_SERVER_HOST = "craftunity.mcsh.io"
 DEFAULT_SERVER_PORT = 25565
