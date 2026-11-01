@@ -306,7 +306,8 @@
 <script>
 // Константы, которые нужно заменить перед публикацией:
 var RELEASES_URL = "https://github.com/daniprocrut-ui/craftunity/releases"; // ЗАМЕНИТЬ: страница релизов, напр. https://github.com/<user>/<repo>/releases
-var MANIFEST_URL = "./manifest.json";     // манифест рядом со страницей
+var MANIFEST_URL = "./manifest.json";     // манифест рядом со страницей (запасной вариант)
+var PROXY_MANIFEST_URL = "https://craftunity-heartbeat.netlify.app/manifest"; // живой манифест из Dropbox
 
 var downloadBtn = document.getElementById("download-btn");
 var copyBtn = document.getElementById("copy-btn");
@@ -381,10 +382,17 @@ function applyManifest(m) {
   }
 }
 
-fetch(MANIFEST_URL, { cache: "no-store" })
-  .then(function (res) {
+function fetchManifest(url) {
+  return fetch(url, { cache: "no-store" }).then(function (res) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
+  });
+}
+
+// Сначала живой манифест из Dropbox через прокси, затем копия рядом со страницей.
+fetchManifest(PROXY_MANIFEST_URL)
+  .catch(function () {
+    return fetchManifest(MANIFEST_URL);
   })
   .then(applyManifest)
   .catch(function () {
