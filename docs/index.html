@@ -183,6 +183,32 @@
     color: var(--text-soft);
   }
 
+  dl.info dd.sha {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--text-soft);
+    letter-spacing: 0.02em;
+  }
+
+  #smartscreen h3 {
+    margin: 18px 0 8px;
+    font-size: 1rem;
+  }
+
+  .smartscreen-lead {
+    margin: 0 0 10px;
+    color: var(--text-soft);
+  }
+
+  .smartscreen-lead code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--bg-alt, rgba(127, 127, 127, 0.14));
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85rem;
+  }
+
   .notes:empty,
   .notes.hidden {
     display: none;
@@ -268,6 +294,8 @@
         <dd id="minecraft-version">&mdash;</dd>
         <dt>Обновлено</dt>
         <dd id="updated-at">&mdash;</dd>
+        <dt>Контрольная сумма</dt>
+        <dd id="launcher-sha" class="sha">&mdash;</dd>
       </dl>
       <div id="mandatory-badge" class="hidden" style="margin-top:14px"></div>
       <div class="dl-actions">
@@ -276,11 +304,57 @@
       <div id="notes" class="notes"></div>
     </section>
 
+    <section class="card" id="smartscreen">
+      <h2>Windows не даёт запустить файл?</h2>
+      <p class="smartscreen-lead">
+        Лаунчер &mdash; один exe без установки, поэтому при первом запуске Windows показывает
+        «Система Windows защитила ваш компьютер» или «Не удалось найти приложение».
+        Это не вирус: файл просто новый и пока без цифровой подписи.
+      </p>
+
+      <h3>Окно «Система Windows защитила ваш компьютер»</h3>
+      <p class="smartscreen-lead">
+        Синий экран с текстом «Фильтр SmartScreen в Microsoft Defender предотвратил запуск
+        неопознанного приложения» и единственной кнопкой «Не выполнять» внизу справа.
+      </p>
+      <ol class="steps">
+        <li>Нажмите ссылку <b>«Подробнее»</b> слева, под текстом про неопознанное приложение.</li>
+        <li>Внизу слева появится кнопка <b>«Выполнить в любом случае»</b> &mdash; нажмите её.</li>
+        <li>Если кнопки нет: закройте окно, откройте свойства exe и отметьте <b>«Разблокировать»</b>, затем запустите снова.</li>
+      </ol>
+
+      <h3>Окно «Не удалось найти приложение» / файл не запускается</h3>
+      <ol class="steps">
+        <li>Нажмите <b>Подробнее</b> в окне.</li>
+        <li>Выберите в списке <b>Smartscreen.exe</b> и нажмите <b>Удалить</b>.</li>
+        <li>Повторите запуск лаунчера.</li>
+      </ol>
+
+      <h3>Если файл просто скачался и не открывается</h3>
+      <ol class="steps">
+        <li>Откройте папку с файлом и нажмите правой кнопкой на exe.</li>
+        <li>В свойствах на вкладке «Общие» отметьте <b>Разблокировать</b> и нажмите «ОК».</li>
+        <li>Запустите файл снова.</li>
+      </ol>
+
+      <h3>Проверить, что файл не изменён</h3>
+      <p class="smartscreen-lead">
+        В PowerShell выполните <code>Get-FileHash Craftunity_launcher.exe -Algorithm SHA256</code>
+        и сравните с контрольной суммой выше. Совпадает &mdash; файл подлинный.
+      </p>
+
+      <h3>Как убрать предупреждение навсегда</h3>
+      <p class="smartscreen-lead">
+        Окно исчезает только после подписи файла цифровым сертификатом (OV/EV).
+        Рядом с релизом всегда лежит sha256 &mdash; по ней можно проверить, что exe не подменён.
+      </p>
+    </section>
+
     <section class="card">
       <h2>Как играть</h2>
       <ol class="steps">
         <li>Скачайте exe и сохраните его в любое место.</li>
-        <li>Запустите файл. Windows может показать запрос SmartScreen &mdash; подтвердите запуск.</li>
+        <li>Запустите файл. Windows при первом запуске покажет окно SmartScreen &mdash; как пройти его, см. выше.</li>
         <li>В лаунчере войдите по нику или через аккаунт ely.by.</li>
         <li>Нажмите кнопку &laquo;Играть&raquo; и ждите загрузки.</li>
       </ol>
