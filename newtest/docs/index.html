@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Craftunity — скачать лаунчер</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --bg-soft: #10131b;
+    --card: #161a24;
+    --card-2: #1c222f;
+    --line: #2a3350;
+    --text: #e9eefb;
+    --text-soft: #cdd6ea;
+    --muted: #8b95b2;
+    --accent: #fb923c;
+    --accent-hover: #fdab5f;
+    --accent-fg: #201206;
+    --warning: #fbbf24;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 56px 24px 64px;
+  }
+
+  header {
+    margin-bottom: 40px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+
+  .brand::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--accent);
+    flex: none;
+  }
+
+  h1 {
+    margin: 18px 0 12px;
+    font-size: clamp(32px, 6vw, 46px);
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .lead {
+    margin: 0;
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 560px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+
+  .card h2 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  .dl-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-top: 18px;
+  }
+
+  .btn {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+    font-size: 16px;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 26px;
+    text-decoration: none;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.15s ease;
+  }
+
+  .btn:hover {
+    background: var(--accent-hover);
+  }
+
+  .btn.secondary {
+    background: transparent;
+    color: var(--text-soft);
+    border: 1px solid var(--line);
+  }
+
+  .btn.secondary:hover {
+    border-color: var(--muted);
+    background: var(--card-2);
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 13px;
+    color: var(--warning);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-weight: 500;
+  }
+
+  dl.info {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 20px;
+    margin: 0;
+  }
+
+  dl.info dt {
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  dl.info dd {
+    margin: 0;
+    font-weight: 500;
+    word-break: break-word;
+  }
+
+  dl.info dd .dim {
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .notes {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    white-space: pre-line;
+    color: var(--text-soft);
+  }
+
+  dl.info dd.sha {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--text-soft);
+    letter-spacing: 0.02em;
+  }
+
+  #smartscreen h3 {
+    margin: 18px 0 8px;
+    font-size: 1rem;
+  }
+
+  .smartscreen-lead {
+    margin: 0 0 10px;
+    color: var(--text-soft);
+  }
+
+  .smartscreen-lead code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--bg-alt, rgba(127, 127, 127, 0.14));
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85rem;
+  }
+
+  .notes:empty,
+  .notes.hidden {
+    display: none;
+  }
+
+  ol.steps {
+    margin: 0;
+    padding-left: 22px;
+  }
+
+  ol.steps li {
+    margin-bottom: 8px;
+    color: var(--text-soft);
+  }
+
+  ol.steps li::marker {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .server {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .server code {
+    font-family: "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    user-select: all;
+  }
+
+  .copied {
+    color: var(--accent);
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 1.2em;
+  }
+
+  footer {
+    margin-top: 44px;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 32px 16px 48px; }
+    .card { padding: 18px; }
+    .dl-actions .btn { flex: 1 1 100%; }
+  }
+
+  @media (max-width: 360px) {
+    dl.info { grid-template-columns: 1fr; gap: 2px; }
+    dl.info dt { white-space: normal; }
+    dl.info dd { margin-bottom: 8px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">Craftunity</div>
+      <h1>Клиент Craftunity</h1>
+      <p class="lead">Собственный лаунчер для сервера craftunity3.mcsh.io. Один файл без установки: скачал и запустил.</p>
+    </header>
+
+    <section class="card">
+      <h2>Скачать лаунчер</h2>
+      <dl class="info">
+        <dt>Версия лаунчера</dt>
+        <dd id="launcher-version">&mdash;</dd>
+        <dt>Версия сборки</dt>
+        <dd id="build-version">&mdash;</dd>
+        <dt>Майнкрафт</dt>
+        <dd id="minecraft-version">&mdash;</dd>
+        <dt>Обновлено</dt>
+        <dd id="updated-at">&mdash;</dd>
+      </dl>
+      <div id="mandatory-badge" class="hidden" style="margin-top:14px"></div>
+      <div class="dl-actions">
+        <a id="download-btn" class="btn" href="#" target="_blank" rel="noopener">Скачать лаунчер</a>
+      </div>
+      <div id="notes" class="notes"></div>
+    </section>
+
+    <section class="card" id="smartscreen">
+      <h2>Windows не даёт запустить файл?</h2>
+      <p class="smartscreen-lead">
+        Лаунчер &mdash; один exe без установки, поэтому при первом запуске Windows показывает
+        «Система Windows защитила ваш компьютер» или «Не удалось найти приложение».
+        Это не вирус: файл просто новый и пока без цифровой подписи.
+      </p>
+
+      <h3>Окно «Система Windows защитила ваш компьютер»</h3>
+      <p class="smartscreen-lead">
+        Синий экран с текстом «Фильтр SmartScreen в Microsoft Defender предотвратил запуск
+        неопознанного приложения» и единственной кнопкой «Не выполнять» внизу справа.
+      </p>
+      <ol class="steps">
+        <li>Нажмите ссылку <b>«Подробнее»</b> слева, под текстом про неопознанное приложение.</li>
+        <li>Внизу слева появится кнопка <b>«Выполнить в любом случае»</b> &mdash; нажмите её.</li>
+        <li>Если кнопки нет: закройте окно, откройте свойства exe и отметьте <b>«Разблокировать»</b>, затем запустите снова.</li>
+      </ol>
+
+      <h3>Окно «Не удалось найти приложение» / файл не запускается</h3>
+      <ol class="steps">
+        <li>Нажмите <b>Подробнее</b> в окне.</li>
+        <li>Выберите в списке <b>Smartscreen.exe</b> и нажмите <b>Удалить</b>.</li>
+        <li>Повторите запуск лаунчера.</li>
+      </ol>
+
+      <h3>Если файл просто скачался и не открывается</h3>
+      <ol class="steps">
+        <li>Откройте папку с файлом и нажмите правой кнопкой на exe.</li>
+        <li>В свойствах на вкладке «Общие» отметьте <b>Разблокировать</b> и нажмите «ОК».</li>
+        <li>Запустите файл снова.</li>
+      </ol>
+
+      <h3>Как убрать предупреждение навсегда</h3>
+      <p class="smartscreen-lead">
+        Окно исчезает только после подписи файла цифровым сертификатом (OV/EV).
+        Без подписи Windows будет показывать его при каждом новом обновлении лаунчера.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Как играть</h2>
+      <ol class="steps">
+        <li>Скачайте exe и сохраните его в любое место.</li>
+        <li>Запустите файл. Windows при первом запуске покажет окно SmartScreen &mdash; как пройти его, см. выше.</li>
+        <li>В лаунчере войдите по нику или через аккаунт ely.by.</li>
+        <li>Нажмите кнопку &laquo;Играть&raquo; и ждите загрузки.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Сервер</h2>
+      <div class="server">
+        <code id="server-addr">craftunity3.mcsh.io:25565</code>
+        <button id="copy-btn" class="btn secondary" type="button">Скопировать адрес</button>
+      </div>
+      <div id="copy-status" class="copied"></div>
+      <p style="color:var(--muted);margin:10px 0 0;font-size:14px">
+        Один и тот же адрес используется в лаунчере &mdash; вводить его вручную не нужно.
+      </p>
+    </section>
+
+    <footer>
+      <span id="server-footer">craftunity3.mcsh.io</span>
+    </footer>
+  </div>
+
+<script>
+// Константы, которые нужно заменить перед публикацией:
+var RELEASES_URL = "https://github.com/daniprocrut-ui/craftunity/releases"; // ЗАМЕНИТЬ: страница релизов, напр. https://github.com/<user>/<repo>/releases
+var MANIFEST_URL = "./manifest.json";     // манифест рядом со страницей (запасной вариант)
+var PROXY_MANIFEST_URL = "https://craftunity-heartbeat.netlify.app/manifest"; // живой манифест из Dropbox
+
+var downloadBtn = document.getElementById("download-btn");
+var copyBtn = document.getElementById("copy-btn");
+var copyStatus = document.getElementById("copy-status");
+
+function el(id, text) {
+  var node = document.getElementById(id);
+  if (node) node.textContent = text;
+}
+
+function setMandatory(isMandatory) {
+  var holder = document.getElementById("mandatory-badge");
+  if (isMandatory !== true) return;
+  var badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = "Обновление обязательное";
+  holder.appendChild(badge);
+  holder.classList.remove("hidden");
+}
+
+function fmtDate(iso) {
+  if (typeof iso !== "string" || !iso) return null;
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  var dd = String(d.getDate()).padStart(2, "0");
+  var mm = String(d.getMonth() + 1).padStart(2, "0");
+  return dd + "." + mm + "." + d.getFullYear();
+}
+
+function applyManifest(m) {
+  if (!m) return;
+
+  if (m.launcher && typeof m.launcher.version === "string") {
+    el("launcher-version", m.launcher.version);
+  }
+  if (typeof m.version === "string") {
+    el("build-version", m.version);
+  }
+  if (m.game) {
+    var parts = [];
+    if (typeof m.game.version === "string") parts.push(m.game.version);
+    if (typeof m.game.loader === "string") parts.push(m.game.loader);
+    if (parts.length) el("minecraft-version", parts.join(" \u2014 "));
+  }
+  if (typeof m.updated_at === "string") {
+    var d = fmtDate(m.updated_at);
+    if (d) el("updated-at", d);
+  }
+
+  if (m.launcher && m.launcher.notes) {
+    el("notes", String(m.launcher.notes));
+    document.getElementById("notes").classList.remove("hidden");
+  }
+
+  if (m.launcher && typeof m.launcher.mandatory === "boolean") {
+    setMandatory(m.launcher.mandatory);
+  }
+
+  if (m.server && typeof m.server.host === "string" && m.server.host) {
+    var port = m.server.port ? String(m.server.port) : "";
+    SERVER_ADDR = port ? m.server.host + ":" + port : m.server.host;
+    var addrNode = document.getElementById("server-addr");
+    if (addrNode) addrNode.textContent = SERVER_ADDR;
+    var footNode = document.getElementById("server-footer");
+    if (footNode) footNode.textContent = m.server.host;
+  }
+
+  if (m.launcher && typeof m.launcher.url === "string" && m.launcher.url) {
+    downloadBtn.href = m.launcher.url;
+  } else {
+    downloadBtn.href = RELEASES_URL;
+  }
+}
+
+function fetchManifest(url) {
+  return fetch(url, { cache: "no-store" }).then(function (res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  });
+}
+
+// Сначала живой манифест из Dropbox через прокси, затем копия рядом со страницей.
+fetchManifest(PROXY_MANIFEST_URL)
+  .catch(function () {
+    return fetchManifest(MANIFEST_URL);
+  })
+  .then(applyManifest)
+  .catch(function () {
+    // манифест недоступен (например, при открытии file://) — страница остаётся целой,
+    // значения показывают «—», кнопка ведёт на страницу релизов.
+    downloadBtn.href = RELEASES_URL;
+  });
+
+var SERVER_ADDR = "craftunity3.mcsh.io:25565";
+
+function fallbackCopy(text) {
+  var ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch (e) {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+copyBtn.addEventListener("click", function () {
+  var done = false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(SERVER_ADDR).then(function () {
+      copyStatus.textContent = "Адрес скопирован";
+      setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+    }).catch(function () {
+      done = fallbackCopy(SERVER_ADDR);
+      copyStatus.textContent = done ? "Адрес скопирован" : "";
+      if (done) setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+    });
+  } else {
+    done = fallbackCopy(SERVER_ADDR);
+    copyStatus.textContent = done ? "Адрес скопирован" : "";
+    if (done) setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+  }
+});
+</script>
+</body>
+</html>
