@@ -16,7 +16,9 @@ from craftunity import config, manifest  # noqa: E402
 CONFIG_PATH = ROOT / "craftunity" / "config.py"
 DIST_EXE = ROOT / "dist" / "Craftunity_launcher.exe"
 SITE_DIR = ROOT / "docs"
+LAUNCHER_DIR = SITE_DIR / "launcher"
 ASSET_NAME = "Craftunity_launcher.exe"
+KEEP_BUILDS = 2
 
 
 def sha256(path: Path) -> str:
@@ -69,16 +71,59 @@ def pages_manifest_url(repo: str) -> str:
     return f"https://{owner.lower()}.github.io/{name}/manifest.json"
 
 
+def pages_launcher_url(repo: str, version: str) -> str:
+    """Адрес сборки в той же папке на сервере, где лежит манифест."""
+    owner, name = repo.split("/", 1)
+    return f"https://{owner.lower()}.github.io/{name}/launcher/{version}/{ASSET_NAME}"
+
+
+def _version_key(text: str) -> tuple[int, ...]:
+    parts: list[int] = []
+    for chunk in text.split("."):
+        digits = "".join(ch for ch in chunk if ch.isdigit())
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def stage_launcher(version: str) -> Path:
+    """Кладёт собранный exe в docs/launcher/<версия>/ и удаляет лишние старые сборки."""
+    target_dir = LAUNCHER_DIR / version
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / ASSET_NAME
+    shutil.copy2(DIST_EXE, target)
+    print(f"→ docs/launcher/{version}/{ASSET_NAME}")
+
+    keep = {version}
+    others = sorted(
+        (item for item in LAUNCHER_DIR.iterdir() if item.is_dir() and item.name != version),
+        key=lambda item: _version_key(item.name),
+        reverse=True,
+    )
+    keep.update(item.name for item in others[: max(0, KEEP_BUILDS - 1)])
+    for item in LAUNCHER_DIR.iterdir():
+        if item.is_dir() and item.name not in keep:
+            shutil.rmtree(item, ignore_errors=True)
+            print(f"удалена старая сборка: docs/launcher/{item.name}")
+    return target
+
+
 def set_source_constants(repo: str) -> None:
     """Прописывает в config.py адрес манифеста на GitHub Pages и зеркала."""
     url = pages_manifest_url(repo)
     fallbacks = [
-        f"https://cdn.jsdelivr.net/gh/{repo}@main/docs/manifest.json",
         f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json",
+        f"https://cdn.jsdelivr.net/gh/{repo}@main/docs/manifest.json",
     ]
+    raw = f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json"
+    raw_sig = f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json.sig"
     text = CONFIG_PATH.read_text(encoding="utf-8")
     text = re.sub(r'GITHUB_REPO = "[^"]*"', f'GITHUB_REPO = "{repo}"', text, count=1)
-    text = re.sub(r'DEFAULT_MANIFEST_URL = "[^"]*"', f'DEFAULT_MANIFEST_URL = "{url}"', text, count=1)
+    text = re.sub(r'DEFAULT_MANIFEST_URL = "[^"]*"', f'DEFAULT_MANIFEST_URL = "{raw}"', text, count=1)
+    text = re.sub(
+        r'DEFAULT_MANIFEST_SIG_URL = "[^"]*"', f'DEFAULT_MANIFEST_SIG_URL = "{raw_sig}"', text, count=1
+    )
     list_body = "".join(f'    "{item}",\n' for item in fallbacks)
     text = re.sub(
         r"MANIFEST_FALLBACKS: list\[str\] = \[[^\]]*\]",
@@ -140,7 +185,7 @@ def upload(repo: str, version: str, notes: str, allow_empty_notes: bool) -> str:
     return url
 
 
-def publish_manifest(version: str, url: str, digest: str, notes: str, mandatory: bool) -> Path:
+def publish_manifest(version: str, url: str, digest: str, notes: str, mandatory: bool, mirror: str = "") -> Path:
     data = manifest.manifest_for_admin()
     block = dict(data.get("launcher") or {})
     block.update(
@@ -152,7 +197,11 @@ def publish_manifest(version: str, url: str, digest: str, notes: str, mandatory:
             "mandatory": bool(mandatory),
         }
     )
+    mirror = mirror.strip()
+    block["mirrors"] = [mirror] if mirror and mirror != url else []
     data["launcher"] = block
+    if config.HEARTBEAT_URL:
+        data["heartbeat_url"] = config.HEARTBEAT_URL
     if mandatory:
         data["min_launcher"] = version
     saved = manifest.save_admin_manifest(data)
@@ -166,7 +215,14 @@ def publish_manifest(version: str, url: str, digest: str, notes: str, mandatory:
 
 
 def commit_and_push(version: str, push: bool) -> None:
-    files = ["craftunity/config.py", "docs/index.html", "docs/manifest.json", "docs/manifest.json.sig", "README.md"]
+    files = [
+        "craftunity/config.py",
+        "docs/index.html",
+        "docs/manifest.json",
+        "docs/manifest.json.sig",
+        "docs/launcher",
+        "README.md",
+    ]
     existing = [name for name in files if (ROOT / name).exists()]
     run(["git", "add", *existing], cwd=ROOT)
     run(["git", "commit", "-m", f"release: Craftunity Launcher {version}"], cwd=ROOT)
@@ -199,8 +255,10 @@ def main() -> int:
 
     repo = repo_slug(args.repo)
     tag_url = f"https://github.com/{repo}/releases/download/v{version}/{ASSET_NAME}"
+    folder_url = pages_launcher_url(repo, version)
     print(f"Выпуск {old} → {version}")
-    print(f"Файл:       {tag_url}")
+    print(f"Папка сервера: {folder_url}")
+    print(f"Зеркало:       {tag_url}")
     print(f"Обязательное: {'да' if args.mandatory else 'нет'}")
     if args.dry_run:
         print("Dry run: ничего не меняю.")
@@ -216,11 +274,12 @@ def main() -> int:
     digest = sha256(DIST_EXE)
     print(f"sha256: {digest}")
 
-    url = tag_url
+    stage_launcher(version)
+    mirror = ""
     if not args.no_upload:
-        url = upload(repo, version, args.notes, allow_empty_notes=True)
+        mirror = upload(repo, version, args.notes, allow_empty_notes=True)
 
-    publish_manifest(version, url, digest, args.notes, args.mandatory)
+    publish_manifest(version, folder_url, digest, args.notes, args.mandatory, mirror)
     if not args.no_commit:
         commit_and_push(version, args.push)
     print("\nГотово. Текущие клиенты получат обновление при следующем запуске.")
