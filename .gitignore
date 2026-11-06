@@ -1,4 +1,4 @@
-__pycache__/
+﻿__pycache__/
 *.pyc
 *.pyo
 build/
@@ -6,3 +6,14 @@ dist/
 .venv/
 venv/
 *.log
+
+# Local Netlify folder
+.netlify
+
+# Секреты и локальные ссылки
+dropbox_token.txt
+dropbox_links.json
+.data/
+
+# Собранные exe в документации публикуются отдельно через Releases
+docs/launcher/**/*.exe
