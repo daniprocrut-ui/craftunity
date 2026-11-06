@@ -214,6 +214,70 @@ function accountLabel(account) {
   return account.type === "ely" ? "Аккаунт ely.by" : "Оффлайн-аккаунт";
 }
 
+function greetingText(date = new Date()) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return "Доброе утро";
+  if (hour >= 12 && hour < 18) return "Добрый день";
+  if (hour >= 18 && hour < 23) return "Добрый вечер";
+  return "Доброй ночи";
+}
+
+function refreshGreeting() {
+  const node = $("#heroName");
+  if (!node) return;
+  const account = (state.overview || {}).account;
+  const nickname = account ? account.username : "Гость";
+  node.textContent = `${greetingText()}, ${nickname}`;
+}
+
+function renderHolidayDecor(event, still) {
+  const layer = $("#holidayLayer");
+  if (!layer) return;
+  layer.innerHTML = "";
+  const count = Math.min(30, Number(event.count) || 18);
+  const shape = event.shape || "dot";
+  for (let index = 0; index < count; index += 1) {
+    const piece = document.createElement("span");
+    piece.className = `holiday-piece shape-${shape}${still ? " still" : ""}`;
+    const size = (shape === "pumpkin" ? 14 : 5) + Math.round(Math.random() * 7);
+    piece.style.left = `${Math.round(Math.random() * 100)}%`;
+    piece.style.width = `${size}px`;
+    piece.style.height = `${size}px`;
+    piece.style.opacity = (0.25 + Math.random() * 0.45).toFixed(2);
+    piece.style.setProperty("--holiday-top", `${Math.round(Math.random() * 95)}%`);
+    if (!still) {
+      piece.style.animationDelay = `${(Math.random() * 9).toFixed(2)}s`;
+      piece.style.animationDuration = `${(10 + Math.random() * 10).toFixed(2)}s`;
+    }
+    layer.appendChild(piece);
+  }
+}
+
+function applyHoliday(event, settings) {
+  const root = document.documentElement;
+  const enabled = (settings || {}).holiday_theme !== false;
+  const chip = $("#holidayChip");
+  if (!event || !enabled) {
+    root.removeAttribute("data-holiday");
+    const layer = $("#holidayLayer");
+    if (layer) layer.innerHTML = "";
+    if (chip) chip.remove();
+    return;
+  }
+  root.dataset.holiday = String(event.id || "");
+  renderHolidayDecor(event, Boolean((settings || {}).reduce_motion));
+  const chips = $("#heroChips");
+  if (!chips) return;
+  let badge = $("#holidayChip");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "chip holiday-chip";
+    badge.id = "holidayChip";
+    chips.appendChild(badge);
+  }
+  badge.textContent = String(event.title || "");
+}
+
 function renderOverview(data) {
   state.overview = data;
   const account = data.account;
@@ -221,7 +285,7 @@ function renderOverview(data) {
   const game = manifest.game || {};
   const server = manifest.server || {};
 
-  $("#heroName").textContent = account ? account.username : "Гость";
+  refreshGreeting();
   $("#heroType").textContent = accountLabel(account);
   $("#launcherVer").textContent = data.launcher_version || "—";
   $("#statusVersion").textContent = "v" + (data.launcher_version || "1.0.0");
@@ -235,6 +299,7 @@ function renderOverview(data) {
   const cached = data.manifest_source === "cache";
   if (cached) chips.push(`<span class="chip" style="border-color:rgba(255,193,7,.4)">Манифест <b>из кеша</b></span>`);
   $("#heroChips").innerHTML = chips.join("");
+  applyHoliday(data.holiday, data.settings || {});
 
   const warn = $("#manifestWarn");
   if (warn) {
@@ -245,7 +310,7 @@ function renderOverview(data) {
       warn.innerHTML = `<b style="color:#ffd479">Версия не подтверждена сервером.</b> `
         + `${escapeHtml(data.manifest_error || "манифест не получен")}<br>`
         + `Запустится локальная сборка <b>${escapeHtml(localVersion)}</b> · Fabric. `
-        + `Проверьте URL манифеста в настройках или включите сервер в админ-панели.`;
+        + `Проверьте адрес манифеста в настройках — он лежит в Dropbox или на GitHub Pages.`;
     } else {
       warn.style.display = "none";
     }
@@ -314,8 +379,17 @@ function renderOverview(data) {
   $("#optReduceMotion").checked = Boolean(settings.reduce_motion);
   $("#optAutoJava").checked = settings.auto_java !== false;
   $("#optAutoJoin").checked = settings.auto_join !== false;
+  if ($("#optHoliday")) $("#optHoliday").checked = settings.holiday_theme !== false;
   if (document.activeElement !== $("#setMemory")) $("#setMemory").value = settings.memory_mb || 4096;
   if (document.activeElement !== $("#setJava")) $("#setJava").value = settings.java_path || "";
+  if ($("#setCurseforgeKey") && document.activeElement !== $("#setCurseforgeKey")) {
+    $("#setCurseforgeKey").value = settings.curseforge_key || "";
+  }
+  if ($("#curseforgeState")) {
+    $("#curseforgeState").textContent = settings.curseforge_key
+      ? "CurseForge включён: выдача из двух каталогов, дубли ставятся с Modrinth"
+      : "CurseForge выключен: без ключа поиск идёт только по Modrinth";
+  }
   $("#setVersion").value = `${game.version || settings.game_version} / ${game.loader || settings.loader}`;
   $("#setServer").value = `${host}:${port}`;
   if ($("#manifestAuto")) {
@@ -390,8 +464,9 @@ function renderMods() {
       <div class="mod" data-open="${hit.id}">
         <img src="${hit.icon_hd || hit.icon || ""}" alt="" data-fallback="${hit.icon || ""}" onerror="fallbackIcon(this)">
         <div class="mod-body">
-          <div class="title">${escapeHtml(hit.title)}</div>
+          <div class="title">${escapeHtml(hit.title)} <span class="chip" style="margin-left:6px">${hit.source === "curseforge" ? "CurseForge" : "Modrinth"}</span></div>
           <div class="desc">${escapeHtml(hit.description || "")}</div>
+          ${hit.author ? `<div class="author">автор: ${escapeHtml(hit.author)}</div>` : ""}
           <div class="foot">
             <span class="stat">${fmt(hit.downloads)} загрузок</span>
             <button class="btn small" data-install="${hit.id}" ${installed ? "disabled" : ""}>
@@ -407,9 +482,22 @@ function renderMods() {
   more.style.display = state.results.length < (state.modTotal || state.results.length) ? "flex" : "none";
 }
 
+function syncUploadButton(kind) {
+  const button = $("#uploadPack");
+  const input = $("#packFile");
+  if (!button || !input) return;
+  const isMod = kind === "mod";
+  button.textContent = isMod ? "Добавить .jar" : "Добавить .zip";
+  button.title = isMod
+    ? "Добавить свой .jar в папку модов"
+    : "Добавить свой .zip: ресурспак или архив шейдера";
+  input.accept = isMod ? ".jar" : ".zip";
+}
+
 function switchContentKind(kind) {
   if (!CONTENT_LABELS[kind]) kind = "mod";
   state.contentKind = kind;
+  syncUploadButton(kind);
   $$("#contentTabs button").forEach((btn) => btn.classList.toggle("active", btn.dataset.kind === kind));
   const label = CONTENT_LABELS[kind];
   $("#contentTitle").textContent = label.title;
@@ -453,7 +541,7 @@ async function searchMods(query, append = false) {
     const hits = data.hits || [];
     state.results = append ? state.results.concat(hits) : hits;
     state.modOffset = state.results.length;
-    state.modTotal = data.total || state.results.length;
+    state.modTotal = data.total_hits || data.total || state.results.length;
     if (!state.results.length) {
       $("#modFilter").textContent = `Ничего не найдено среди ${CONTENT_LABELS[state.contentKind].many} под текущую версию`;
     }
@@ -484,49 +572,87 @@ async function loadInstalled() {
   }
 }
 
+function packModIds() {
+  const list = (((state.overview || {}).manifest || {}).mods) || [];
+  const ids = new Set();
+  list.forEach((entry) => {
+    const id = String(entry.project_id || entry.slug || "");
+    if (id) ids.add(id);
+  });
+  return ids;
+}
+
 function renderInstalled() {
   const box = $("#installedMods");
   if (!box) return;
   const filter = state.installedFilter || "all";
-  const items = state.installed.filter((item) => filter === "all" || (item.kind || "mod") === filter);
+  const packIds = packModIds();
+  const onlyPack = filter === "modpack";
+  const items = state.installed.filter((item) => {
+    const kind = item.kind || "mod";
+    const inPack = kind === "mod" && packIds.has(String(item.project_id || ""));
+    if (onlyPack) return inPack;
+    return filter === "all" || kind === filter;
+  });
   box.className = "installed-grid mode-" + (state.contentView || "tiles");
   const hint = $("#installedHint");
   if (hint) {
-    hint.textContent = `Всего: ${state.installed.length}` + (filter === "all" ? "" : ` · показано: ${items.length}`);
+    hint.textContent = onlyPack
+      ? `Модов в модпаке: ${items.length} · состав задаётся сервером, удалить их нельзя`
+      : `Всего: ${state.installed.length}` + (filter === "all" ? "" : ` · показано: ${items.length}`);
   }
   if (!items.length) {
-    box.innerHTML = `<div class="empty">Пока ничего не установлено</div>`;
+    box.innerHTML = onlyPack
+      ? `<div class="empty">Модпак ещё не установлен — запустите игру или нажмите «Играть»</div>`
+      : `<div class="empty">Пока ничего не установлено</div>`;
     return;
   }
   box.innerHTML = items.map((mod) => {
     const label = CONTENT_LABELS[mod.kind] || CONTENT_LABELS.mod;
     const tracked = !mod.untracked && !String(mod.project_id || "").startsWith("file:");
-    const openAttr = tracked ? ` data-open="${escapeHtml(mod.project_id)}"` : "";
+    const openAttr = mod.project_id ? ` data-open="${escapeHtml(mod.project_id)}"` : "";
+    const locked = (mod.kind || "mod") === "mod" && packIds.has(String(mod.project_id || ""));
     const removeAttrs = mod.untracked
       ? `data-remove-file="1" data-kind="${mod.kind || "mod"}" data-filename="${escapeHtml(mod.filename || "")}"`
       : `data-remove="${escapeHtml(mod.project_id || "")}"`;
+    const disabled = Boolean(mod.disabled);
+    const toggleAttrs = mod.untracked
+      ? `data-toggle-file="1" data-kind="${mod.kind || "mod"}" data-filename="${escapeHtml(mod.filename || "")}" data-enabled="${disabled ? "0" : "1"}"`
+      : `data-toggle="${escapeHtml(mod.project_id || "")}" data-enabled="${disabled ? "0" : "1"}"`;
+    const toggleHtml = `<button class="btn small${disabled ? "" : " ghost"}" ${toggleAttrs}>${disabled ? "Включить" : "Выключить"}</button>`;
+    const actions = disabled
+      ? toggleHtml
+      : toggleHtml +
+        (locked
+          ? `<span class="chip" title="Мод приходит из модпака и обновляется сервером">из модпака</span>`
+          : `<button class="btn small danger" ${removeAttrs}>Удалить</button>`);
+    const removeHtml = `<div class="installed-actions">${actions}</div>`;
+    const stateChip = disabled ? `<span class="chip off">выключен</span>` : "";
     const title = escapeHtml(mod.title || mod.slug || "файл");
-    const iconSrc = mod.icon_hd || mod.icon || "";
+    const remoteIcon = mod.icon_hd || mod.icon || "";
+    const iconSrc = tracked ? `/api/icon/${encodeURIComponent(mod.project_id)}` : remoteIcon;
     const icon = iconSrc
-      ? `<img class="installed-icon" src="${iconSrc}" alt="" data-fallback="${mod.icon || ""}" onerror="fallbackIcon(this)">`
+      ? `<img class="installed-icon" src="${iconSrc}" alt="" data-fallback="${escapeHtml(remoteIcon)}" onerror="fallbackIcon(this)">`
       : `<div class="installed-icon placeholder">${escapeHtml((mod.title || mod.slug || "?").trim().charAt(0).toUpperCase())}</div>`;
     if (state.contentView === "list") {
       return `
-        <div class="list-item installed-item"${openAttr}>
+        <div class="list-item installed-item${disabled ? " is-off" : ""}"${openAttr}>
           ${icon}
           <div class="grow">
-            <div class="name">${title} <span class="chip" style="margin-left:6px">${label.one}</span></div>
+            <div class="name">${title} <span class="chip" style="margin-left:6px">${label.one}</span> ${stateChip}</div>
             <div class="meta">${escapeHtml(mod.version || "")} ${mod.filename ? "· " + escapeHtml(mod.filename) : ""}</div>
+            ${mod.description ? `<div class="installed-desc">${escapeHtml(mod.description)}</div>` : ""}
           </div>
-          <button class="btn small danger" ${removeAttrs}>Удалить</button>
+          ${removeHtml}
         </div>`;
     }
     return `
-      <div class="installed-card installed-item"${openAttr}>
+      <div class="installed-card installed-item${disabled ? " is-off" : ""}"${openAttr}>
         ${icon}
         <div class="installed-title">${title}</div>
-        <div class="installed-meta"><span class="chip">${label.one}</span> ${escapeHtml(mod.version || "")}</div>
-        <button class="btn small danger" ${removeAttrs}>Удалить</button>
+        <div class="installed-meta"><span class="chip">${label.one}</span> ${escapeHtml(mod.version || "")} ${stateChip}</div>
+        ${mod.description ? `<div class="installed-desc">${escapeHtml(mod.description)}</div>` : ""}
+        ${removeHtml}
       </div>`;
   }).join("");
 }
@@ -611,6 +737,9 @@ function renderProject(project) {
   const chips = [label.one, ...(project.categories || []).slice(0, 5)]
     .map((value) => `<span class="chip">${escapeHtml(value)}</span>`)
     .join("");
+  const authors = (project.authors || [])
+    .map((author) => `<a href="#" class="author-link" data-url="${escapeHtml(author.url)}" title="${escapeHtml(author.role || "")}">@${escapeHtml(author.username)}</a>`)
+    .join(", ");
 
   $("#modalBody").innerHTML = `
     <div class="project-head">
@@ -618,6 +747,7 @@ function renderProject(project) {
       <div>
         <div class="project-title">${escapeHtml(project.title)}</div>
         <div class="project-sub">${fmt(project.downloads)} загрузок${project.license ? " · " + escapeHtml(project.license) : ""}</div>
+        ${authors.length ? `<div class="project-authors">Создатели: ${authors}</div>` : ""}
         <div class="chips">${chips}</div>
       </div>
     </div>
@@ -632,8 +762,23 @@ function renderProject(project) {
 
   $("#modalInstall").addEventListener("click", () => installProject(project.id, kind, $("#modalInstall")));
   $("#modalTranslate").addEventListener("click", toggleDescription);
+  $("#modalModrinth").textContent = project.source === "curseforge" ? "Открыть на CurseForge" : "Открыть на Modrinth";
+  if (project.source === "file") {
+    $("#modalModrinth").style.display = "none";
+    const fileInstall = $("#modalInstall");
+    if (fileInstall) {
+      fileInstall.textContent = "Установлено";
+      fileInstall.disabled = true;
+    }
+  }
   $("#modalModrinth").addEventListener("click", () =>
-    openUrl(`https://modrinth.com/${kind === "mod" ? "mod" : kind}/${project.slug}`));
+    openUrl(project.page_url || `https://modrinth.com/${kind === "mod" ? "mod" : kind}/${project.slug}`));
+  $$("#modalBody .author-link").forEach((link) =>
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openUrl(link.dataset.url);
+    }));
 }
 
 async function translateDescription(project) {
@@ -846,7 +991,9 @@ async function saveSettings() {
     reduce_motion: $("#optReduceMotion").checked,
     auto_java: $("#optAutoJava").checked,
     auto_join: $("#optAutoJoin").checked,
+    holiday_theme: $("#optHoliday") ? $("#optHoliday").checked : true,
     content_view: state.contentView,
+    curseforge_key: $("#setCurseforgeKey") ? $("#setCurseforgeKey").value.trim() : "",
   };
   try {
     await api("/api/settings", {
@@ -927,25 +1074,26 @@ function bindEvents() {
       saveSettings();
     });
   });
-  $("#uploadPack").addEventListener("click", () => {
-    if (state.contentKind === "mod") {
-      toast("Выберите «Ресурспаки» или «Шейдеры», чтобы добавить .zip", true);
-      return;
-    }
-    $("#packFile").click();
-  });
+  syncUploadButton(state.contentKind);
+  $("#uploadPack").addEventListener("click", () => $("#packFile").click());
   $("#packFile").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      toast("Нужен файл .zip", true);
+    const isMod = state.contentKind === "mod";
+    const suffix = isMod ? ".jar" : ".zip";
+    if (!file.name.toLowerCase().endsWith(suffix)) {
+      toast(isMod ? "Для модов нужен файл .jar" : "Для ресурспаков и шейдеров нужен .zip", true);
       return;
     }
     try {
       const response = await fetch(
         `/api/content/upload?kind=${encodeURIComponent(state.contentKind)}&name=${encodeURIComponent(file.name)}`,
-        { method: "POST", headers: { "Content-Type": "application/zip" }, body: file },
+        {
+          method: "POST",
+          headers: { "Content-Type": isMod ? "application/java-archive" : "application/zip" },
+          body: file,
+        },
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
@@ -968,6 +1116,36 @@ function bindEvents() {
     if (card) openProject(card.dataset.open);
   });
   $("#installedMods").addEventListener("click", async (e) => {
+    if (e.target.dataset.toggleFile) {
+      const enabled = e.target.dataset.enabled !== "1";
+      try {
+        e.target.disabled = true;
+        await api("/api/content/toggle", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: e.target.dataset.kind,
+            filename: e.target.dataset.filename,
+            enabled,
+          }),
+        });
+        toast(enabled ? "Включено" : "Выключено");
+        loadInstalled();
+      } catch (err) { toast(err.message, true); e.target.disabled = false; }
+      return;
+    }
+    if (e.target.dataset.toggle !== undefined && !e.target.dataset.toggleFile) {
+      const enabled = e.target.dataset.enabled !== "1";
+      try {
+        e.target.disabled = true;
+        await api("/api/content/toggle", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project_id: e.target.dataset.toggle, enabled }),
+        });
+        toast(enabled ? "Включено" : "Выключено");
+        loadInstalled();
+      } catch (err) { toast(err.message, true); e.target.disabled = false; }
+      return;
+    }
     if (e.target.dataset.removeFile) {
       if (!confirm("Удалить файл?")) return;
       try {
@@ -1135,6 +1313,30 @@ function bindEvents() {
   $("#elyRegister").addEventListener("click", () => openUrl("https://account.ely.by/registration"));
 
   $("#saveSettings").addEventListener("click", saveSettings);
+  const cfKeyInput = $("#setCurseforgeKey");
+  const cfSaveKey = async () => {
+    const key = (cfKeyInput ? cfKeyInput.value : "").trim();
+    if (!key) {
+      toast("Вставьте ключ со страницы console.curseforge.com", true);
+      return;
+    }
+    try {
+      const result = await api("/api/curseforge/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      if (result.ok) {
+        toast("Ключ принят — CurseForge включён");
+        await refresh();
+      } else {
+        toast(result.error || "CurseForge не принял ключ", true);
+      }
+    } catch (err) { toast(err.message, true); }
+  };
+  if ($("#cfGetKey")) $("#cfGetKey").addEventListener("click", () => openUrl("https://console.curseforge.com/?#/api-keys"));
+  if ($("#cfSaveKey")) $("#cfSaveKey").addEventListener("click", cfSaveKey);
+  if (cfKeyInput) cfKeyInput.addEventListener("change", cfSaveKey);
   $("#themeToggle").addEventListener("click", () => {
     const current = document.documentElement.dataset.theme || "dark";
     const index = THEMES.findIndex((item) => item.id === current);
@@ -1148,6 +1350,7 @@ function bindEvents() {
   });
   $("#optAutoJava").addEventListener("change", saveSettings);
   $("#optAutoJoin").addEventListener("change", saveSettings);
+  if ($("#optHoliday")) $("#optHoliday").addEventListener("change", saveSettings);
   $("#refreshManifest").addEventListener("click", async () => {
     try {
       const result = await api("/api/manifest/refresh", { method: "POST" });
@@ -1162,6 +1365,7 @@ async function boot() {
   await refresh();
   await loadInstalled();
   state.polling = setInterval(refresh, 1200);
+  setInterval(refreshGreeting, 60000);
 }
 
 boot();

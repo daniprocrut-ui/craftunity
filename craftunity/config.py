@@ -6,13 +6,18 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Craftunity"
-LAUNCHER_VERSION = "1.2.7"
+LAUNCHER_VERSION = "1.3.29"
 
 GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"
+DEFAULT_MANIFEST_SIG_URL = "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json.sig"
 MANIFEST_REFRESH_SECONDS = 60
 HEARTBEAT_URL = "https://craftunity-heartbeat.netlify.app"
-LEGACY_MANIFEST_URLS = ("https://craftunity.mcsh.io/launcher/manifest.json",)
+LEGACY_MANIFEST_URLS = (
+    "https://craftunity.mcsh.io/launcher/manifest.json",
+    "https://daniprocrut-ui.github.io/craftunity/manifest.json",
+    "https://www.dropbox.com/scl/fi/ipn0oz4wn0sdl8z9k1cyj/manifest.json?rlkey=knsrqdlptkx2k8fkxxen2o4wl&dl=1",
+)
 MANIFEST_FALLBACKS: list[str] = [
     "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json",
     "https://cdn.jsdelivr.net/gh/daniprocrut-ui/craftunity@main/docs/manifest.json",
@@ -82,6 +87,7 @@ def state_path() -> Path:
 def settings_defaults() -> dict:
     return {
         "manifest_url": DEFAULT_MANIFEST_URL,
+        "manifest_sig_url": DEFAULT_MANIFEST_SIG_URL,
         "heartbeat_url": "",
         "server_host": DEFAULT_SERVER_HOST,
         "server_port": DEFAULT_SERVER_PORT,
@@ -98,6 +104,8 @@ def settings_defaults() -> dict:
         "content_view": "tiles",
         "reduce_motion": False,
         "accept_manifest": True,
+        "curseforge_key": "",
+        "holiday_theme": True,
     }
 
 
@@ -149,6 +157,8 @@ def load_settings() -> dict:
     current = settings.get("manifest_url")
     if current in LEGACY_MANIFEST_URLS and DEFAULT_MANIFEST_URL not in LEGACY_MANIFEST_URLS:
         settings["manifest_url"] = DEFAULT_MANIFEST_URL
+        if DEFAULT_MANIFEST_SIG_URL and not settings.get("manifest_sig_url"):
+            settings["manifest_sig_url"] = DEFAULT_MANIFEST_SIG_URL
     return settings
 
 

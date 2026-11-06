@@ -5,7 +5,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('ui', 'ui'), ('keys', 'keys')]
 binaries = []
-hiddenimports = ['webview', 'clr']
+hiddenimports = ['webview', 'clr', 'encodings.idna']
 datas += collect_data_files('certifi')
 hiddenimports += collect_submodules('pythonnet')
 tmp_ret = collect_all('webview')

@@ -1,0 +1,7 @@
+﻿name = "craftunity-heartbeat"
+main = "index.js"
+compatibility_date = "2026-10-01"
+
+[[kv_namespaces]]
+binding = "CLIENTS"
+id = "455ad9f1530b44c1a4d88f44d84f8152"

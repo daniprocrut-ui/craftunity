@@ -14,10 +14,20 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from . import config, manifest
+from . import catalog
+from . import dropbox as dropbox_store
 from . import mods as modrinth_api
+from . import packstore
 from . import palette as palette_mod
 from . import skins
-from .admin_server import ManifestServer, publish_dir, read_clients
+from .admin_server import (
+    ManifestServer,
+    clients_for_admin,
+    delete_clients,
+    publish_dir,
+    read_heartbeat_config,
+    save_heartbeat_config,
+)
 from .discovery import Beacon, lan_ip
 from .util import LauncherError, ssl_context
 
@@ -37,6 +47,39 @@ ACCENT_DISABLED_BG = PALETTE["accent_disabled_bg"]
 ACCENT_DISABLED_FG = PALETTE["accent_disabled_fg"]
 CARD_HOVER = PALETTE["card_hover"]
 SEL_BG = PALETTE["sel_bg"]
+
+
+class ScrollTab(ttk.Frame):
+    """Вкладка с вертикальной прокруткой: содержимое кладётся во внутренний фрейм."""
+
+    def __init__(self, master, padding: int = 16) -> None:
+        super().__init__(master)
+        self.canvas = tk.Canvas(self, bg=BG, highlightthickness=0, bd=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        self.inner = ttk.Frame(self.canvas, padding=padding)
+        self._window = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        self.inner.bind("<Configure>", self._sync_region)
+        self.canvas.bind("<Configure>", self._sync_width)
+        self.canvas.bind("<Enter>", self._bind_wheel)
+        self.canvas.bind("<Leave>", self._unbind_wheel)
+
+    def _sync_region(self, _event=None) -> None:
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _sync_width(self, event) -> None:
+        self.canvas.itemconfigure(self._window, width=event.width)
+
+    def _bind_wheel(self, _event=None) -> None:
+        self.canvas.bind_all("<MouseWheel>", self._on_wheel)
+
+    def _unbind_wheel(self, _event=None) -> None:
+        self.canvas.unbind_all("<MouseWheel>")
+
+    def _on_wheel(self, event) -> None:
+        self.canvas.yview_scroll(int(-event.delta / 120), "units")
 
 
 class AvatarLoader:
@@ -121,6 +164,7 @@ class AdminApp:
         self.server: ManifestServer | None = None
         self.beacon: Beacon | None = None
         self.mods: list[dict] = []
+        self.result_buttons: dict[str, ttk.Button] = {}
         self.manifest_data: dict = {}
         self._clients_timer = None
         self.ui_queue: queue.Queue = queue.Queue()
@@ -129,8 +173,12 @@ class AdminApp:
         self.search_total = 0
 
         root.title("Craftunity Admin")
-        root.geometry("980x700")
-        root.minsize(880, 620)
+        screen_w = root.winfo_screenwidth()
+        screen_h = root.winfo_screenheight()
+        width = min(980, max(720, screen_w - 120))
+        height = min(700, max(520, screen_h - 160))
+        root.geometry(f"{width}x{height}")
+        root.minsize(680, 460)
         root.configure(bg=BG)
         icon = config.resource_path("icon_admin.ico")
         if not icon.exists():
@@ -195,14 +243,19 @@ class AdminApp:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=18, pady=(6, 0))
 
-        self.tab_build = ttk.Frame(self.notebook, padding=16)
-        self.tab_mods = ttk.Frame(self.notebook, padding=16)
-        self.tab_clients = ttk.Frame(self.notebook, padding=16)
-        self.tab_publish = ttk.Frame(self.notebook, padding=16)
-        self.notebook.add(self.tab_build, text="Сборка")
-        self.notebook.add(self.tab_mods, text="Модпак")
-        self.notebook.add(self.tab_clients, text="Клиенты")
-        self.notebook.add(self.tab_publish, text="Публикация")
+        self.page_build = ScrollTab(self.notebook)
+        self.page_mods = ScrollTab(self.notebook)
+        self.page_clients = ScrollTab(self.notebook)
+        self.page_publish = ScrollTab(self.notebook)
+        self.notebook.add(self.page_build, text="Сборка")
+        self.notebook.add(self.page_mods, text="Модпак")
+        self.notebook.add(self.page_clients, text="Клиенты")
+        self.notebook.add(self.page_publish, text="Публикация")
+
+        self.tab_build = self.page_build.inner
+        self.tab_mods = self.page_mods.inner
+        self.tab_clients = self.page_clients.inner
+        self.tab_publish = self.page_publish.inner
 
         self._build_tab_build()
         self._build_tab_mods()
@@ -219,9 +272,39 @@ class AdminApp:
             style="Muted.TLabel",
         ).pack(side="right")
 
+    def _clipboard(self, entry: ttk.Entry) -> ttk.Entry:
+        """Вставка из буфера: Ctrl+V, Shift+Insert и меню по правой кнопке."""
+        menu = tk.Menu(entry, tearoff=0)
+        menu.add_command(label="Вставить", command=lambda: entry.event_generate("<<Paste>>"))
+        menu.add_command(label="Копировать", command=lambda: entry.event_generate("<<Copy>>"))
+        menu.add_command(label="Вырезать", command=lambda: entry.event_generate("<<Cut>>"))
+        menu.add_separator()
+        menu.add_command(label="Выделить всё", command=lambda: self._select_all(entry))
+
+        def popup(event):
+            entry.focus_set()
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+            return "break"
+
+        entry.bind("<Button-3>", popup)
+        entry.bind("<Shift-Insert>", lambda _event: (entry.event_generate("<<Paste>>"), "break")[1])
+        entry.bind("<Control-v>", lambda _event: (entry.event_generate("<<Paste>>"), "break")[1])
+        entry.bind("<Control-V>", lambda _event: (entry.event_generate("<<Paste>>"), "break")[1])
+        entry.bind("<Control-a>", lambda _event: (self._select_all(entry), "break")[1])
+        entry.bind("<Control-A>", lambda _event: (self._select_all(entry), "break")[1])
+        return entry
+
+    @staticmethod
+    def _select_all(entry: ttk.Entry) -> None:
+        entry.selection_range(0, "end")
+        entry.icursor("end")
+
     def _field(self, parent: ttk.Frame, row: int, column: int, label: str, variable: tk.Variable, width: int = 26) -> ttk.Entry:
         ttk.Label(parent, text=label, style="Muted.TLabel").grid(row=row * 2, column=column, sticky="w", padx=(0, 12), pady=(0, 2))
-        entry = ttk.Entry(parent, textvariable=variable, width=width)
+        entry = self._clipboard(ttk.Entry(parent, textvariable=variable, width=width))
         entry.grid(row=row * 2 + 1, column=column, sticky="ew", padx=(0, 12), pady=(0, 10))
         return entry
 
@@ -294,7 +377,7 @@ class AdminApp:
         row = ttk.Frame(top)
         row.pack(fill="x", pady=(4, 8))
         self.var_search = tk.StringVar()
-        entry = ttk.Entry(row, textvariable=self.var_search, width=40)
+        entry = self._clipboard(ttk.Entry(row, textvariable=self.var_search, width=40))
         entry.pack(side="left")
         entry.bind("<Return>", lambda _event: self.search_modrinth())
         ttk.Button(row, text="Найти", command=self.search_modrinth).pack(side="left", padx=8)
@@ -323,19 +406,20 @@ class AdminApp:
 
         right = ttk.Frame(body)
         ttk.Label(right, text="Модпак сервера", style="Card.TLabel", font=("Segoe UI Semibold", 12)).pack(anchor="w", padx=4)
+        mods_wrap = ttk.Frame(right)
+        mods_wrap.pack(fill="both", expand=True, padx=4, pady=(6, 8))
         columns = ("project", "title")
-        self.mods_tree = ttk.Treeview(right, columns=columns, show="headings", height=14)
+        self.mods_tree = ttk.Treeview(mods_wrap, columns=columns, show="headings", height=14)
         self.mods_tree.heading("project", text="PROJECT ID / SLUG")
         self.mods_tree.heading("title", text="НАЗВАНИЕ")
         self.mods_tree.column("project", width=180, anchor="w")
         self.mods_tree.column("title", width=220, anchor="w")
-        mods_wrap = ttk.Frame(right)
-        mods_wrap.pack(fill="both", expand=True, padx=4, pady=(6, 8))
         mods_scroll = ttk.Scrollbar(mods_wrap, orient="vertical", command=self.mods_tree.yview)
         self.mods_tree.configure(yscrollcommand=mods_scroll.set)
-        self.mods_tree.pack(in_=mods_wrap, side="left", fill="both", expand=True)
+        self.mods_tree.pack(side="left", fill="both", expand=True)
         mods_scroll.pack(side="right", fill="y")
         ttk.Button(right, text="Убрать выбранное", command=self.remove_mod).pack(anchor="w", padx=4)
+        ttk.Button(right, text="Добавить .jar файлом", command=self.add_file_mod).pack(anchor="w", padx=4, pady=(6, 0))
 
         body.add(left, weight=3)
         body.add(right, weight=2)
@@ -383,11 +467,11 @@ class AdminApp:
             self.search_offset = 0
         game = ((self.manifest_data.get("game") or {}).get("version")) or "1.20.1"
         offset = self.search_offset
-        self.search_state.configure(text="Ищу в Modrinth…")
+        self.search_state.configure(text="Ищу в Modrinth и CurseForge…")
 
         def work() -> None:
             try:
-                data = modrinth_api.search(
+                data = catalog.search_all(
                     self.search_query,
                     game,
                     "fabric",
@@ -400,7 +484,15 @@ class AdminApp:
                 self.ui_queue.put(lambda err=exc: self.search_state.configure(text=f"Ошибка: {err}"))
                 return
             hits = data.get("hits") or []
-            total = int(data.get("total") or 0)
+            total = int(data.get("total_hits") or 0)
+            warning = str(data.get("warning") or "")
+            cf = data.get("curseforge") or {}
+            suffix = ""
+            if cf.get("enabled"):
+                suffix = f" · CurseForge: {cf.get('found', 0)}, дублей скрыто: {cf.get('duplicates', 0)}"
+            elif warning:
+                suffix = ""
+            self.ui_queue.put(lambda: self.search_state.configure(text=f"Найдено: {total}{suffix}"))
             self.ui_queue.put(lambda: self._render_results(hits, total, append))
 
         threading.Thread(target=work, daemon=True).start()
@@ -413,6 +505,7 @@ class AdminApp:
             for child in self.results_frame.winfo_children():
                 child.destroy()
             self.more_btn = None
+            self.result_buttons.clear()
         elif self.more_btn is not None and self.more_btn.winfo_exists():
             self.more_btn.destroy()
             self.more_btn = None
@@ -421,8 +514,11 @@ class AdminApp:
             position = start + index
             card = tk.Frame(self.results_frame, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
             card.grid(row=position // 3, column=position % 3, padx=6, pady=6, sticky="nsew")
-            icon = tk.Label(card, text="…", bg=CARD, fg=MUTED, width=64, height=64)
-            icon.pack(pady=(10, 6))
+            icon_box = tk.Frame(card, bg=CARD, width=64, height=64)
+            icon_box.pack_propagate(False)
+            icon_box.pack(pady=(10, 6))
+            icon = tk.Label(icon_box, text="…", bg=CARD, fg=MUTED)
+            icon.pack(fill="both", expand=True)
             tk.Label(
                 card,
                 text=hit.get("title") or "",
@@ -438,8 +534,26 @@ class AdminApp:
                 bg=CARD,
                 fg=MUTED,
                 font=("Segoe UI", 8),
-            ).pack(pady=(2, 6))
-            ttk.Button(card, text="Добавить", command=lambda h=hit: self.add_from_hit(h)).pack(pady=(0, 10))
+            ).pack(pady=(2, 2))
+            tk.Label(
+                card,
+                text="CurseForge" if hit.get("source") == "curseforge" else "Modrinth",
+                bg=CARD,
+                fg=ACCENT if hit.get("source") == "curseforge" else MUTED,
+                font=("Segoe UI", 7),
+            ).pack(pady=(0, 4))
+            project_id = hit.get("id") or hit.get("slug") or ""
+            added = self._in_pack(project_id)
+            button = ttk.Button(
+                card,
+                text="В модпаке" if added else "Добавить",
+                command=lambda h=hit: self.add_from_hit(h),
+            )
+            if added:
+                button.state(["disabled"])
+            button.pack(pady=(0, 10))
+            if project_id:
+                self.result_buttons[project_id] = button
             self._load_icon(hit.get("icon"), icon)
         for column in range(3):
             self.results_frame.grid_columnconfigure(column, weight=1)
@@ -488,16 +602,29 @@ class AdminApp:
                 photo = tk.PhotoImage(data=base64.b64encode(raw))
                 factor = max(1, photo.width() // 48)
                 photo = photo.subsample(factor)
-            label.configure(image=photo, text="", width=64, height=64)
+            label.configure(image=photo, text="")
             label.image = photo  # type: ignore[attr-defined]
         except Exception:
             pass
+
+    def _in_pack(self, project_id: str) -> bool:
+        if not project_id:
+            return False
+        return any((mod.get("project_id") or mod.get("slug")) == project_id for mod in self.mods)
+
+    def _mark_added(self, project_id: str, added: bool) -> None:
+        button = self.result_buttons.get(project_id)
+        if button is None or not button.winfo_exists():
+            return
+        button.configure(text="В модпаке" if added else "Добавить")
+        button.state(["disabled"] if added else ["!disabled"])
 
     def add_from_hit(self, hit: dict) -> None:
         project_id = hit.get("id") or hit.get("slug")
         if not project_id:
             return
-        if any((mod.get("project_id") or mod.get("slug")) == project_id for mod in self.mods):
+        if self._in_pack(project_id):
+            self._mark_added(project_id, True)
             self.set_status("Этот мод уже в модпаке")
             return
         self.mods.append(
@@ -509,6 +636,7 @@ class AdminApp:
             }
         )
         self.render_mods()
+        self._mark_added(project_id, True)
         self.set_status(f"Добавлено: {hit.get('title')} — не забудьте опубликовать")
 
     def _build_tab_clients(self) -> None:
@@ -520,9 +648,27 @@ class AdminApp:
             style="Muted.TLabel",
         ).pack(side="left")
         ttk.Button(top, text="Обновить", command=self.refresh_clients).pack(side="right")
+        ttk.Button(top, text="Удалить выбранных", command=self.delete_selected_clients).pack(
+            side="right", padx=(0, 8)
+        )
+        ttk.Button(top, text="Удалить офлайн", command=self.delete_offline_clients).pack(
+            side="right", padx=(0, 8)
+        )
 
-        columns = ("user", "version", "loader", "seen", "id")
-        self.clients_tree = ttk.Treeview(self.tab_clients, columns=columns, show="tree headings", height=15)
+        remote = ttk.Frame(self.tab_clients)
+        remote.pack(fill="x", pady=(0, 10))
+        ttk.Label(remote, text="Приёмник heartbeat", style="Muted.TLabel").pack(anchor="w")
+        saved = read_heartbeat_config()
+        self.var_hb_url = tk.StringVar(value=saved["url"])
+        self.var_hb_token = tk.StringVar(value=saved["token"])
+        self._clipboard(ttk.Entry(remote, textvariable=self.var_hb_url, width=52)).pack(side="left", padx=(0, 8), pady=(4, 0))
+        self._clipboard(ttk.Entry(remote, textvariable=self.var_hb_token, width=22, show="*")).pack(side="left", padx=(0, 8), pady=(4, 0))
+        ttk.Button(remote, text="Сохранить", command=self.save_heartbeat_receiver).pack(side="left", pady=(4, 0))
+
+        clients_wrap = ttk.Frame(self.tab_clients)
+        clients_wrap.pack(fill="both", expand=True)
+        columns = ("user", "version", "loader", "seen", "online", "id")
+        self.clients_tree = ttk.Treeview(clients_wrap, columns=columns, show="tree headings", height=15)
         self.clients_tree.heading("#0", text="")
         self.clients_tree.column("#0", width=52, minwidth=52, stretch=False, anchor="center")
         for key, title, width in (
@@ -530,18 +676,22 @@ class AdminApp:
             ("version", "ВЕРСИЯ", 120),
             ("loader", "ЗАГРУЗЧИК", 120),
             ("seen", "ПОСЛЕДНЯЯ АКТИВНОСТЬ", 220),
+            ("online", "В СЕТИ", 160),
             ("id", "ID КЛИЕНТА", 160),
         ):
             self.clients_tree.heading(key, text=title)
             self.clients_tree.column(key, width=width, anchor="w")
-        clients_wrap = ttk.Frame(self.tab_clients)
-        clients_wrap.pack(fill="both", expand=True)
         clients_scroll = ttk.Scrollbar(clients_wrap, orient="vertical", command=self.clients_tree.yview)
         self.clients_tree.configure(yscrollcommand=clients_scroll.set)
-        self.clients_tree.pack(in_=clients_wrap, side="left", fill="both", expand=True)
+        self.clients_tree.pack(side="left", fill="both", expand=True)
         clients_scroll.pack(side="right", fill="y")
+        self.clients_tree.bind("<Double-1>", lambda _event: self._open_client_content())
 
-        self.clients_hint = ttk.Label(self.tab_clients, text="Пока нет данных", style="Muted.TLabel")
+        self.clients_hint = ttk.Label(
+            self.tab_clients,
+            text="Двойной клик по клиенту — список его модов, ресурспаков и шейдеров",
+            style="Muted.TLabel",
+        )
         self.clients_hint.pack(anchor="w", pady=(10, 0))
 
     def _build_tab_publish(self) -> None:
@@ -553,13 +703,15 @@ class AdminApp:
         )
         ttk.Label(
             card,
-            text="Включите сервер, чтобы лаунчеры могли скачать манифест по сети. Для интернета нужен HTTPS-прокси на домен.",
+            text="Сервер нужен только для локальной сети и отладки: кнопка «Сохранить и опубликовать» "
+                 "сама кладёт подписанный манифест в папку сервера Dropbox. "
+                 "0.0.0.0 — слушать все интерфейсы; 127.0.0.1 — только этот компьютер.",
             style="CardMuted.TLabel",
             wraplength=780,
             justify="left",
         ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 12))
 
-        self.var_bind = tk.StringVar(value="127.0.0.1")
+        self.var_bind = tk.StringVar(value="0.0.0.0")
         self.var_srv_port = tk.StringVar(value="8765")
         self._field(card, 2, 0, "Адрес прослушивания", self.var_bind)
         self._field(card, 2, 1, "Порт", self.var_srv_port)
@@ -610,7 +762,7 @@ class AdminApp:
         self.var_game.set(game.get("version") or "1.20.1")
         self.var_loader.set(game.get("loader") or "fabric")
         self.var_loader_version.set(game.get("loader_version") or "")
-        self.var_host.set(server.get("host") or "craftunity.mcsh.io")
+        self.var_host.set(server.get("host") or "craftunity3.mcsh.io")
         self.var_port.set(str(server.get("port") or 25565))
         self.var_message.set(data.get("message") or "")
         launcher = data.get("launcher") or {}
@@ -635,12 +787,63 @@ class AdminApp:
         selection = self.mods_tree.selection()
         if not selection:
             return
+        removed: list[str] = []
         for item in selection:
             index = self.mods_tree.index(item)
             if 0 <= index < len(self.mods):
-                self.mods.pop(index)
+                mod = self.mods.pop(index)
+                project_id = str(mod.get("project_id") or mod.get("slug") or "")
+                if project_id:
+                    removed.append(project_id)
         self.render_mods()
+        for project_id in removed:
+            self._mark_added(project_id, False)
         self.set_status("Мод убран из модпака — не забудьте опубликовать")
+
+    def add_file_mod(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Мод для модпака",
+            filetypes=[("Minecraft мод", "*.jar")],
+        )
+        if not path:
+            return
+        self.set_status("Копирую файл в модпак…")
+
+        def work() -> None:
+            try:
+                info = packstore.store_file(Path(path))
+            except LauncherError as exc:
+                text = str(exc)
+                self.ui_queue.put(lambda: self.set_status(text))
+                return
+            except Exception as exc:  # noqa: BLE001
+                text = f"Не удалось добавить файл: {exc}"
+                self.ui_queue.put(lambda: self.set_status(text))
+                return
+            self.ui_queue.put(lambda: self._file_mod_added(info))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _file_mod_added(self, info: dict) -> None:
+        name = str(info.get("filename") or "")
+        project_id = f"file:{name}"
+        if any((mod.get("project_id") or mod.get("slug")) == project_id for mod in self.mods):
+            self.set_status("Этот файл уже в модпаке")
+            return
+        self.mods.append(
+            {
+                "project_id": project_id,
+                "slug": name,
+                "title": Path(name).stem,
+                "filename": name,
+                "url": info.get("url") or "",
+                "sha256": info.get("sha256") or "",
+                "size": info.get("size") or 0,
+                "version": "файл",
+            }
+        )
+        self.render_mods()
+        self.set_status("Файл добавлен в модпак — опубликуйте, чтобы он ушёл игрокам")
 
     def collect(self) -> dict:
         try:
@@ -658,7 +861,7 @@ class AdminApp:
                 "loader_version": self.var_loader_version.get().strip(),
             },
             "server": {
-                "host": self.var_host.get().strip() or "craftunity.mcsh.io",
+                "host": self.var_host.get().strip() or "craftunity3.mcsh.io",
                 "port": port,
                 "auto_join": True,
             },
@@ -692,20 +895,217 @@ class AdminApp:
             return
         self.manifest_data = saved
         self.var_version.set(saved.get("version") or "")
+        target = None
+        try:
+            target = dropbox_store.publish(publish_dir(), saved)
+        except OSError:
+            target = None
+        pack_note = ""
+        if any(str(mod.get("project_id") or "").startswith("file:") for mod in self.mods):
+            try:
+                pack_note = "\n" + packstore.push()
+            except LauncherError as exc:
+                pack_note = f"\nФайлы модпака не ушли на сайт: {exc}"
+        if target is not None:
+            self.set_status(f"Опубликовано: сборка {saved.get('version')} — в папке сервера Dropbox")
+            messagebox.showinfo(
+                "Craftunity Admin",
+                f"Сборка {saved.get('version')} опубликована и подписана.\n\n"
+                f"Папка сервера: {target}\n"
+                "Файлы уйдут в облако при синхронизации Dropbox — сервер в админке держать не нужно."
+                + pack_note,
+            )
+            return
         self.set_status(f"Опубликовано: сборка {saved.get('version')} — подпись обновлена")
         messagebox.showinfo(
             "Craftunity Admin",
             f"Сборка {saved.get('version')} опубликована и подписана.\n\n"
             f"Файлы: {publish_dir()}\n"
-            "Лаунчеры подхватят её при следующем запуске игры.",
+            "Папка Dropbox не найдена — скопируйте файлы на хостинг вручную."
+            + pack_note,
         )
+
+    def save_heartbeat_receiver(self) -> None:
+        save_heartbeat_config(self.var_hb_url.get(), self.var_hb_token.get())
+        self.set_status("Приёмник heartbeat сохранён")
+        self.refresh_clients()
+
+    @staticmethod
+    def _client_is_fresh(client: dict, now: int) -> bool:
+        last_seen = int(client.get("last_seen") or 0)
+        return bool(last_seen) and now - last_seen <= 180
+
+    CONTENT_KIND_NAMES = {
+        "mod": "Моды",
+        "resourcepack": "Ресурспаки",
+        "shader": "Шейдеры",
+    }
+
+    def _open_client_content(self) -> None:
+        """Окно со списком модов, ресурспаков и шейдеров выбранного клиента."""
+        selection = self.clients_tree.selection()
+        if not selection:
+            messagebox.showinfo("Craftunity Admin", "Выберите клиента в таблице.")
+            return
+        values = self.clients_tree.item(selection[0], "values") or ()
+        short_id = str(values[5] or "").strip() if len(values) > 5 else ""
+        username = str(values[0] or "").strip() if values else ""
+        client = None
+        for item in clients_for_admin():
+            instance = str(item.get("instance_id") or "")
+            if instance.startswith(short_id) or instance == short_id:
+                client = item
+                break
+        if client is None:
+            messagebox.showinfo("Craftunity Admin", "Запись клиента не найдена — обновите список.")
+            return
+
+        content = client.get("content")
+        if not isinstance(content, list):
+            messagebox.showinfo(
+                "Craftunity Admin",
+                f"Клиент {username or short_id} ещё не передавал состав.\n\n"
+                "Лаунчер отправляет его при изменении и не чаще раза в 30 минут, "
+                "начиная с версии 1.3.27.",
+            )
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title(f"Craftunity Admin — состав клиента {username or short_id}")
+        window.geometry("640x520")
+        window.minsize(520, 400)
+        window.configure(bg=BG)
+
+        search_var = tk.StringVar()
+        only_off_var = tk.BooleanVar(value=False)
+        kind_var = tk.StringVar(value="all")
+
+        top = ttk.Frame(window)
+        top.pack(fill="x", padx=12, pady=(12, 6))
+        self._clipboard(ttk.Entry(top, textvariable=search_var, width=28)).pack(side="left")
+        for kind, title in (("all", "Все"), ("mod", "Моды"), ("resourcepack", "Ресурспаки"), ("shader", "Шейдеры")):
+            ttk.Radiobutton(
+                top, text=title, value=kind, variable=kind_var, command=lambda: render()
+            ).pack(side="left", padx=(8, 0))
+        ttk.Checkbutton(top, text="только выключенные", variable=only_off_var, command=lambda: render()).pack(
+            side="left", padx=(12, 0)
+        )
+
+        wrap = ttk.Frame(window)
+        wrap.pack(fill="both", expand=True, padx=12, pady=(0, 6))
+        tree = ttk.Treeview(wrap, columns=("title", "kind", "state"), show="headings", height=16)
+        for key, title, width in (("title", "НАЗВАНИЕ", 380), ("kind", "ТИП", 120), ("state", "СОСТОЯНИЕ", 110)):
+            tree.heading(key, text=title)
+            tree.column(key, width=width, anchor="w")
+        scroll = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scroll.set)
+        tree.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+
+        hint = ttk.Label(window, text="", style="Muted.TLabel")
+        hint.pack(anchor="w", padx=12, pady=(0, 12))
+
+        def render() -> None:
+            for item in tree.get_children():
+                tree.delete(item)
+            query = search_var.get().strip().lower()
+            kind_filter = kind_var.get()
+            only_off = bool(only_off_var.get())
+            shown = 0
+            counts = {"mod": 0, "resourcepack": 0, "shader": 0}
+            for entry in content:
+                if not isinstance(entry, dict):
+                    continue
+                title = str(entry.get("title") or "")
+                kind = str(entry.get("kind") or "mod")
+                disabled = bool(entry.get("disabled"))
+                if kind in counts:
+                    counts[kind] += 1
+                if query and query not in title.lower():
+                    continue
+                if kind_filter != "all" and kind != kind_filter:
+                    continue
+                if only_off and not disabled:
+                    continue
+                tree.insert("", "end", values=(title, self.CONTENT_KIND_NAMES.get(kind, kind),
+                                               "выключен" if disabled else "включён"))
+                shown += 1
+            hint.configure(
+                text=f"Модов {counts['mod']} · ресурспаков {counts['resourcepack']} · шейдеров {counts['shader']}"
+                     f" — показано {shown}"
+            )
+
+        render()
+        ttk.Button(window, text="Закрыть", command=window.destroy).pack(anchor="e", padx=12, pady=(0, 12))
+
+    def _selected_client_ids(self) -> list[str]:
+        ids: list[str] = []
+        for item in self.clients_tree.selection():
+            values = self.clients_tree.item(item, "values") or ()
+            if len(values) < 6:
+                continue
+            key = str(values[5] or "").strip()
+            if key:
+                ids.append(key)
+        return ids
+
+    def _remove_clients(self, instance_ids: list[str], question: str) -> None:
+        if not instance_ids:
+            messagebox.showinfo("Craftunity Admin", "Не выбрано ни одного клиента.")
+            return
+        if not messagebox.askyesno("Craftunity Admin", question):
+            return
+        removed, error = delete_clients(instance_ids)
+        self.refresh_clients()
+        if error:
+            self.set_status(f"Удалено локально: {removed}; приёмник не ответил: {error}")
+            messagebox.showwarning(
+                "Craftunity Admin",
+                "Клиент убран из локального списка, но приёмник heartbeat не ответил:\n"
+                f"{error}\n\nЗапись вернётся при следующем чтении, если она ещё есть на приёмнике.",
+            )
+            return
+        self.set_status(f"Удалено клиентов: {removed}")
+
+    def delete_selected_clients(self) -> None:
+        ids = self._selected_client_ids()
+        if not ids:
+            messagebox.showinfo("Craftunity Admin", "Выберите клиентов в таблице (Ctrl — несколько).")
+            return
+        self._remove_clients(ids, f"Удалить клиентов: {len(ids)}? Их записи пропадут из списка.")
+
+    def delete_offline_clients(self) -> None:
+        now = int(time.time())
+        ids = [
+            str(client.get("instance_id") or "")
+            for client in clients_for_admin()
+            if not self._client_is_fresh(client, now) and client.get("instance_id")
+        ]
+        if not ids:
+            messagebox.showinfo("Craftunity Admin", "Офлайн-клиентов нет.")
+            return
+        self._remove_clients(ids, f"Удалить всех офлайн-клиентов: {len(ids)}?")
 
     def refresh_clients(self) -> None:
         for item in self.clients_tree.get_children():
             self.clients_tree.delete(item)
-        clients = read_clients()
+        clients = clients_for_admin()
+        now = int(time.time())
         for client in clients:
-            seen = time.strftime("%d.%m.%Y %H:%M", time.localtime(client.get("last_seen", 0)))
+            last_seen = int(client.get("last_seen") or 0)
+            seen = time.strftime("%d.%m.%Y %H:%M", time.localtime(last_seen)) if last_seen else "—"
+            launcher_started = int(client.get("started") or 0)
+            game_started = int(client.get("game_started") or 0)
+            fresh = self._client_is_fresh(client, now)
+            in_game = bool(client.get("in_game")) and fresh
+            if not fresh:
+                online = "не в сети"
+            elif in_game:
+                since = game_started or last_seen
+                online = f"в игре · {max(0, (now - since) // 60)} мин"
+            else:
+                since = launcher_started or last_seen
+                online = f"в лаунчере · {max(0, (now - since) // 60)} мин"
             username = client.get("username") or ""
             avatar = self.avatars.get(username) if username else None
             row = {
@@ -714,6 +1114,7 @@ class AdminApp:
                     client.get("version") or "—",
                     client.get("loader") or "—",
                     seen,
+                    online,
                     (client.get("instance_id") or "")[:8],
                 ),
             }

@@ -108,9 +108,44 @@ def main() -> int:
 
         httpd.shutdown()
 
+    check("после применения стоял бы карантин", not updater.just_applied())
+    updater.mark_applied("9.9.9")
+    check("сразу после перезапуска карантин активен", updater.just_applied())
+    check("в маркере записана версия", (config.load_json(updater.applied_path()).get("version")) == "9.9.9")
+    check("старый маркер не блокирует", not updater.just_applied(seconds=0))
+    updater.applied_path().unlink(missing_ok=True)
+
+    import types
+
+    fake_dir = TEST_HOME / "fakeapp"
+    fake_dir.mkdir(parents=True, exist_ok=True)
+    fake_exe = fake_dir / "Craftunity_launcher.exe"
+    fake_exe.write_bytes(b"MZ")
+    (fake_dir / "Craftunity_launcher.exe.old").write_bytes(b"old")
+    (updater.update_dir() / "Craftunity_launcher.exe.old").write_bytes(b"old2")
+    real_sys = updater.sys
+    real_frozen = updater.is_frozen
+    updater.sys = types.SimpleNamespace(executable=str(fake_exe))
+    updater.is_frozen = lambda: True
+    try:
+        removed = updater.cleanup_old(attempts=1, delay=0)
+        check("старые копии удалены", removed == 2, str(removed))
+        check("рядом с exe .old нет", not (fake_dir / "Craftunity_launcher.exe.old").exists())
+        check("в папке update .old нет", not (updater.update_dir() / "Craftunity_launcher.exe.old").exists())
+    finally:
+        updater.sys = real_sys
+        updater.is_frozen = real_frozen
+
     doc = manifest.DEFAULT_MANIFEST
     check("в схеме манифеста есть блок launcher", isinstance(doc.get("launcher"), dict))
     check("пустой блок не считается обновлением", updater.available(doc) is None)
+
+    check("в исходниках фоновая подмена не запускается", updater.schedule_apply() is False)
+    check(
+        "скрипт обновления ждёт выхода и подменяет exe",
+        "move /y" in updater.APPLY_BATCH and "--updated" in updater.APPLY_BATCH,
+    )
+    check("скрипт обновления удаляет себя", 'del "%~f0"' in updater.APPLY_BATCH)
 
     print()
     if FAILED:

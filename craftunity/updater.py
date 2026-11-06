@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -131,6 +132,20 @@ def download(url: str, dest: Path, timeout: int = 120) -> Path:
     return dest
 
 
+def _candidates(block: dict, primary: str) -> list[str]:
+    """Основной адрес сборки и запасные зеркала из того же блока манифеста."""
+    result = [primary]
+    mirrors = block.get("mirrors")
+    if isinstance(mirrors, str):
+        mirrors = [mirrors]
+    if isinstance(mirrors, list):
+        for item in mirrors:
+            url = str(item or "").strip()
+            if url.startswith(("http://", "https://")) and url not in result:
+                result.append(url)
+    return result
+
+
 def stage(block: dict, timeout: int = 120) -> Path:
     """Скачивает новый exe рядом с профилем и проверяет контрольную сумму."""
     from .util import LauncherError
@@ -141,11 +156,22 @@ def stage(block: dict, timeout: int = 120) -> Path:
     if not url or not version:
         raise LauncherError("В манифесте нет данных об обновлении лаунчера.")
     target = pending_exe_path()
-    download(url, target, timeout=timeout)
+    last_error: Exception | None = None
+    for candidate in _candidates(block, url):
+        try:
+            download(candidate, target, timeout=timeout)
+        except LauncherError as exc:
+            last_error = exc
+            continue
+        actual = _sha256(target)
+        if expected and actual != expected:
+            target.unlink(missing_ok=True)
+            last_error = LauncherError("Контрольная сумма обновления не совпала — файл удалён.")
+            continue
+        break
+    if last_error is not None:
+        raise last_error
     actual = _sha256(target)
-    if expected and actual != expected:
-        target.unlink(missing_ok=True)
-        raise LauncherError("Контрольная сумма обновления не совпала — файл удалён.")
     meta = {
         "version": version,
         "sha256": actual,
@@ -169,34 +195,80 @@ def pending_info() -> dict | None:
     return meta
 
 
+def applied_path() -> Path:
+    return update_dir() / "applied.json"
+
+
+def mark_applied(version: str) -> None:
+    try:
+        config.save_json(applied_path(), {"version": str(version), "at": int(time.time())})
+    except OSError:
+        pass
+
+
+def just_applied(seconds: int = 180) -> bool:
+    """Защита от цикла: только что перезапустились под эту версию."""
+    data = config.load_json(applied_path())
+    stamp = int(data.get("at") or 0)
+    return bool(stamp) and (time.time() - stamp) < seconds
+
+
 def discard_pending() -> None:
     pending_exe_path().unlink(missing_ok=True)
     pending_meta_path().unlink(missing_ok=True)
 
 
-def cleanup_old() -> None:
-    if not is_frozen():
-        return
+def orphan_copies() -> list[Path]:
     exe = Path(sys.executable)
-    for candidate in (exe.with_name(exe.name + ".old"), update_dir() / ".." / (exe.name + ".old")):
-        try:
-            if candidate.exists():
-                candidate.unlink()
-        except OSError:
-            pass
+    found: list[Path] = []
+    try:
+        for path in exe.parent.glob("*.old"):
+            if path.is_file() and path.name.startswith(exe.name):
+                found.append(path)
+    except OSError:
+        pass
+    try:
+        for path in update_dir().glob("*.old"):
+            if path.is_file() and path not in found:
+                found.append(path)
+    except OSError:
+        pass
+    return found
+
+
+def cleanup_old(attempts: int = 4, delay: float = 1.5) -> int:
+    """Удаляет старые копии exe; повторяет попытки, пока файл занят системой."""
+    if not is_frozen():
+        return 0
+    removed = 0
+    for attempt in range(max(1, attempts)):
+        busy: list[Path] = []
+        for path in orphan_copies():
+            try:
+                path.unlink()
+                removed += 1
+                _log_update(f"удалена старая копия: {path.name}")
+            except OSError:
+                busy.append(path)
+        if not busy:
+            break
+        if attempt + 1 < attempts:
+            time.sleep(delay)
+    return removed
 
 
 def _swap_files(exe: Path, fresh: Path) -> None:
-    old = exe.with_name(exe.name + ".old")
+    """Меняет exe на скачанный; старая копия уносится в папку обновлений, а не рядом с ярлыком."""
+    old = update_dir() / (exe.name + ".old")
     try:
         old.unlink(missing_ok=True)
     except OSError:
         pass
-    os.replace(exe, old)
+    shutil.move(str(exe), str(old))
     try:
         os.replace(fresh, exe)
     except OSError:
-        os.replace(old, exe)
+        shutil.move(str(old), str(exe))
         raise
 
 
@@ -216,12 +288,104 @@ def apply_pending(relaunch_args: list[str] | None = None) -> bool:
         _log_update(f"Не удалось подменить exe: {exc}")
         return False
     pending_meta_path().unlink(missing_ok=True)
+    mark_applied(str(info.get("version") or ""))
     args = [str(exe), *(relaunch_args or ["--updated"])]
     try:
         subprocess.Popen(args, cwd=str(exe.parent), close_fds=True)
     except OSError as exc:
         _log_update(f"Не удалось перезапустить лаунчер: {exc}")
         return False
+    return True
+
+
+APPLY_SCRIPT = "apply_update.cmd"
+
+APPLY_BATCH = """@echo off
+chcp 65001 >nul
+setlocal EnableDelayedExpansion
+set "TARGET=%~1"
+set "FRESH=%~2"
+set "OLD=%~3"
+set /a TRIES=0
+:wait
+if not exist "%FRESH%" goto launch
+if not exist "%OLD%" (
+  move /y "%TARGET%" "%OLD%" >nul 2>&1
+)
+if exist "%OLD%" (
+  move /y "%FRESH%" "%TARGET%" >nul 2>&1
+)
+if not exist "%FRESH%" goto launch
+set /a TRIES+=1
+if !TRIES! GEQ 120 goto giveup
+ping -n 2 127.0.0.1 >nul
+goto wait
+:launch
+start "" "%TARGET%" --updated
+set /a TRIES=0
+:cleanup
+if not exist "%OLD%" goto done
+del /f /q "%OLD%" >nul 2>&1
+if not exist "%OLD%" goto done
+set /a TRIES+=1
+if !TRIES! GEQ 30 goto done
+ping -n 2 127.0.0.1 >nul
+goto cleanup
+:done
+del "%~f0" >nul 2>&1
+exit /b 0
+:giveup
+exit /b 1
+"""
+
+
+def schedule_apply() -> bool:
+    """Ставит обновление в фоне: лаунчер выходит, скрипт ждёт и подменяет exe.
+
+    Нужен, потому что на Windows нельзя заменить запущенный exe — только переименовать,
+    а onefile-сборка держит файл до самого выхода процесса.
+    """
+    if not is_frozen():
+        return False
+    info = pending_info()
+    if not info:
+        discard_pending()
+        return False
+    exe = Path(sys.executable).resolve()
+    fresh = pending_exe_path()
+    old = update_dir() / (exe.name + ".old")
+    try:
+        old.unlink(missing_ok=True)
+    except OSError:
+        pass
+    script = update_dir() / APPLY_SCRIPT
+    try:
+        script.write_text(APPLY_BATCH, encoding="utf-8")
+    except OSError as exc:
+        _log_update(f"Не удалось создать скрипт обновления: {exc}")
+        return False
+    flags = 0
+    startup = None
+    if os.name == "nt":
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", str(script), str(exe), str(fresh), str(old)],
+            cwd=str(exe.parent),
+            close_fds=True,
+            creationflags=flags,
+            startupinfo=startup,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        _log_update(f"Не удалось запустить скрипт обновления: {exc}")
+        return False
+    _log_update(f"Обновление {info.get('version')} ставится в фоне после выхода лаунчера")
     return True
 
 

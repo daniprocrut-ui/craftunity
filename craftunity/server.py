@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import secrets
+import socketserver
 import threading
 import time
 import urllib.parse
@@ -11,7 +12,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import auth, config, files, installer, manifest, mods, skins, state, translate
+from . import auth, catalog, config, files, holidays, installer, manifest, mods, skins, state, translate
 from .launch import Engine
 from .util import LauncherError, human_size
 
@@ -51,6 +52,7 @@ def _overview() -> dict:
         "manifest_fetched_at": ENGINE.manifest_fetched_at,
         "status": ENGINE.snapshot(),
         "installed_mods": len(mods.installed()),
+        "holiday": holidays.active(),
         "skin": skins.local_skin(),
         "game_dir": str(config.game_dir()),
         "java": settings.get("java_path") or installer.detect_java(),
@@ -133,9 +135,21 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/mods/installed":
                 items = mods.installed_all()["items"]
                 return self._send({"mods": items, "items": items})
+            if path.startswith("/api/icon/"):
+                project_id = urllib.parse.unquote(path.rsplit("/", 1)[-1])
+                cached = mods.icon_local(project_id)
+                if cached is None:
+                    return self._error("Иконка не найдена", 404)
+                content_type = mimetypes.guess_type(str(cached))[0] or "image/png"
+                return self._send(cached.read_bytes(), content_type=content_type)
             if path.startswith("/api/project/"):
-                project_id = path.rsplit("/", 1)[-1]
-                if not project_id or not all(ch.isalnum() or ch in "-_" for ch in project_id):
+                project_id = urllib.parse.unquote(path.rsplit("/", 1)[-1])
+                if project_id.startswith("cf:"):
+                    if not project_id[3:].isdigit():
+                        return self._error("Некорректный проект.", 400)
+                elif project_id.startswith("file:"):
+                    return self._send({"ok": True, "project": mods.local_project_info(project_id)})
+                elif not project_id or not all(ch.isalnum() or ch in "-_" for ch in project_id):
                     return self._error("Некорректный проект.", 400)
                 return self._send({"ok": True, "project": mods.project_info(project_id)})
             if path == "/api/files/list":
@@ -206,7 +220,7 @@ class Handler(BaseHTTPRequestHandler):
                 version = manifest_game.get("version") or settings["game_version"]
                 loader = "fabric"
                 kind = data.get("kind") or "mod"
-                result = mods.search(
+                result = catalog.search_all(
                     data.get("query") or "",
                     version,
                     loader,
@@ -222,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
                 manifest_game = ((ENGINE.manifest or {}).get("game") or {})
                 version = manifest_game.get("version") or settings["game_version"]
                 loader = "fabric"
-                item = mods.install_project(
+                item = mods.install(
                     data.get("project_id") or "",
                     version,
                     loader,
@@ -236,6 +250,15 @@ class Handler(BaseHTTPRequestHandler):
                 body = self._read_body(128 * 1024 * 1024)
                 item = mods.install_local_upload(body, name, kind)
                 return self._send({"ok": True, "item": item})
+            if path == "/api/content/toggle":
+                data = self._read_json()
+                result = mods.set_enabled(
+                    project_id=str(data.get("project_id") or ""),
+                    kind=str(data.get("kind") or ""),
+                    filename=str(data.get("filename") or ""),
+                    enabled=bool(data.get("enabled")),
+                )
+                return self._send({"ok": True, **result})
             if path == "/api/content/remove-file":
                 data = self._read_json()
                 removed = mods.remove_local_file(data.get("kind") or "", data.get("filename") or "")
@@ -278,6 +301,17 @@ class Handler(BaseHTTPRequestHandler):
                 data = self._read_json()
                 settings = config.save_settings(data)
                 return self._send({"ok": True, "settings": settings})
+            if path == "/api/curseforge/check":
+                from . import curseforge
+
+                data = self._read_json()
+                key = str(data.get("key") or "").strip()
+                try:
+                    curseforge.check_key(key)
+                except LauncherError as exc:
+                    return self._send({"ok": False, "error": str(exc)})
+                config.save_settings({"curseforge_key": key})
+                return self._send({"ok": True, "saved": True})
             if path == "/api/manifest/refresh":
                 manifest_data = ENGINE.refresh_manifest()
                 return self._send({"ok": bool(manifest_data), "manifest": manifest_data, "error": ENGINE.manifest_error})
@@ -374,7 +408,18 @@ def _safe_prepare(deep: bool = False) -> None:
         ENGINE._fail(f"Ошибка установки: {exc}")  # noqa: SLF001
 
 
-ALLOWED_URL_HOSTS = {"account.ely.by", "ely.by", "www.ely.by", "craftunity.mcsh.io", "modrinth.com", "www.modrinth.com"}
+ALLOWED_URL_HOSTS = {
+    "account.ely.by",
+    "ely.by",
+    "www.ely.by",
+    "craftunity.mcsh.io",
+    "modrinth.com",
+    "www.modrinth.com",
+    "curseforge.com",
+    "www.curseforge.com",
+    "legacy.curseforge.com",
+    "console.curseforge.com",
+}
 
 
 def _open_url(url: str) -> None:
@@ -405,9 +450,25 @@ def _open_folder(target: str) -> None:
         subprocess.Popen(["xdg-open", str(path)])
 
 
+class LocalHTTPServer(ThreadingHTTPServer):
+    """Локальный сервер без обратного резолва имени.
+
+    Штатный server_bind() зовёт socket.getfqdn(), а тот тянет encodings.idna,
+    которого нет в сборке PyInstaller — получался LookupError: unknown encoding: idna.
+    """
+
+    daemon_threads = True
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = int(port)
+
+
 def serve(port: int = 0, mode: str = "client", host: str = "127.0.0.1") -> tuple[ThreadingHTTPServer, int]:
     Handler.mode = mode
-    server = ThreadingHTTPServer((host, port), Handler)
+    server = LocalHTTPServer((host, port), Handler)
     server.daemon_threads = True
     actual = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)

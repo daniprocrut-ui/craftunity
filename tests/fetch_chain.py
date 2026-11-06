@@ -55,12 +55,13 @@ def main() -> int:
         check("зеркало отдаёт подписанный манифест", manifest.fetch_manifest(mirror).get("version") == manifest.DEFAULT_MANIFEST["version"])
 
         config.save_settings({"manifest_url": "http://127.0.0.1:9/manifest.json", "accept_manifest": True})
+        config.DEFAULT_MANIFEST_URL = "http://127.0.0.1:9/default.json"
         config.MANIFEST_FALLBACKS = [mirror]
 
         engine = launch.Engine()
         fetched = engine.refresh_manifest(force=True)
         check("манифест подтянулся с зеркала", bool(fetched))
-        check("источник помечен как зеркало", engine.manifest_source == "fallback", engine.manifest_source)
+        check("источник помечен как зеркало", engine.manifest_source == "mirror", engine.manifest_source)
         check("ошибки не осталось", engine.manifest_error == "")
         check("основной адрес не перезаписан", config.load_settings()["manifest_url"] == "http://127.0.0.1:9/manifest.json")
 
@@ -70,6 +71,50 @@ def main() -> int:
         httpd.shutdown()
 
     config.MANIFEST_FALLBACKS = []
+
+    def serve_dir(directory: Path):
+        handler = lambda *args, **kwargs: http.server.SimpleHTTPRequestHandler(  # noqa: E731
+            *args, directory=str(directory), **kwargs
+        )
+        server = socketserver.TCPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server, server.server_address[1]
+
+    def write_manifest(directory: Path, build: str, launcher_version: str, updated: str) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        data = json.loads(json.dumps(manifest.DEFAULT_MANIFEST))
+        data["version"] = build
+        data["updated_at"] = updated
+        data["launcher"] = {
+            "version": launcher_version,
+            "url": "http://127.0.0.1:9/x.exe",
+            "sha256": "0" * 64,
+            "notes": "",
+            "mandatory": False,
+        }
+        body, signature = manifest.sign_manifest(data)
+        (directory / "manifest.json").write_bytes(body)
+        (directory / "manifest.json.sig").write_bytes(signature)
+
+    stale_dir = TEST_HOME / "stale"
+    fresh_dir = TEST_HOME / "fresh"
+    write_manifest(stale_dir, "26.1", "1.0.0", "2026-01-01T00:00:00Z")
+    write_manifest(fresh_dir, "26.3", "9.9.9", "2026-10-31T12:00:00Z")
+    stale_srv, stale_port = serve_dir(stale_dir)
+    fresh_srv, fresh_port = serve_dir(fresh_dir)
+    config.save_settings({"manifest_url": f"http://127.0.0.1:{stale_port}/manifest.json"})
+    config.DEFAULT_MANIFEST_URL = f"http://127.0.0.1:{fresh_port}/manifest.json"
+
+    engine2 = launch.Engine()
+    picked = engine2.refresh_manifest(force=True) or {}
+    check(
+        "устаревшее зеркало не выигрывает у свежего",
+        (picked.get("launcher") or {}).get("version") == "9.9.9",
+        str((picked.get("launcher") or {}).get("version")),
+    )
+    check("источник — свежий адрес", engine2.manifest_source == "mirror", engine2.manifest_source)
+    stale_srv.shutdown()
+    fresh_srv.shutdown()
 
     legacy = dict(config.settings_defaults())
     legacy["manifest_url"] = config.LEGACY_MANIFEST_URLS[0]
@@ -93,7 +138,8 @@ def main() -> int:
         values["DEFAULT_MANIFEST_URL"],
     )
     check("два зеркала", len(values["MANIFEST_FALLBACKS"]) == 2, str(values["MANIFEST_FALLBACKS"]))
-    check("json-зеркало на jsDelivr", "cdn.jsdelivr.net/gh/someone/craftunity@main/docs/manifest.json" in values["MANIFEST_FALLBACKS"][0])
+    check("json-зеркало на jsDelivr", "cdn.jsdelivr.net/gh/someone/craftunity@main/docs/manifest.json" in values["MANIFEST_FALLBACKS"][1])
+    check("raw-зеркало идёт первым", values["MANIFEST_FALLBACKS"][0].startswith("https://raw.githubusercontent.com/"))
     check("legacy-адрес остался в истории", values["LEGACY_MANIFEST_URLS"][0] == "https://craftunity.mcsh.io/launcher/manifest.json")
 
     print()

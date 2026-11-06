@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+<div class="holiday-layer" id="holidayLayer" aria-hidden="true"></div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
@@ -106,8 +107,8 @@
               <option value="updated">Обновлённые</option>
             </select>
             <button class="btn" id="modSearchBtn" style="flex:none">Найти</button>
-            <button class="btn ghost" id="uploadPack" style="flex:none" title="Добавить свой .zip в ресурспаки или шейдеры">Добавить .zip</button>
-            <input type="file" id="packFile" accept=".zip" style="display:none">
+            <button class="btn ghost" id="uploadPack" style="flex:none" title="Добавить свой .jar в папку модов">Добавить .jar</button>
+            <input type="file" id="packFile" accept=".jar" style="display:none">
           </div>
           <div class="hint" id="modFilter"></div>
         </div>
@@ -124,6 +125,7 @@
           <button data-filter="mod">Моды</button>
           <button data-filter="resourcepack">Ресурспаки</button>
           <button data-filter="shader">Шейдеры</button>
+          <button data-filter="modpack">Модпак</button>
         </div>
         <div class="hint" id="installedHint" style="margin-bottom:12px">Здесь всё, что установлено через лаунчер или положено вручную.</div>
         <div class="list" id="installedMods"><div class="empty">Пока ничего не установлено</div></div>
@@ -277,9 +279,26 @@
               <input type="checkbox" id="optAutoJoin" style="width:18px;height:18px;accent-color:var(--accent)">
               <div class="grow"><div class="name">Автовход на сервер</div><div class="meta">Подключаться к craftunity.mcsh.io при запуске</div></div>
             </label>
+            <label class="list-item" style="cursor:pointer">
+              <input type="checkbox" id="optHoliday" style="width:18px;height:18px;accent-color:var(--accent)">
+              <div class="grow"><div class="name">Праздничное оформление</div><div class="meta">Акцент, баннер и украшения к праздникам</div></div>
+            </label>
           </div>
         </div>
         <div class="grid two">
+          <div class="card">
+            <h3>Каталоги модов</h3>
+            <div class="hint">Поиск идёт сразу по Modrinth и CurseForge. Если мод есть в обоих каталогах, ставится версия с Modrinth. CurseForge работает по бесплатному ключу API (console.curseforge.com).</div>
+            <div class="field" style="margin-top:14px">
+              <label>Ключ CurseForge API</label>
+              <input type="text" id="setCurseforgeKey" placeholder="Без ключа поиск идёт только по Modrinth">
+            </div>
+            <div class="hint" id="curseforgeState">CurseForge выключен</div>
+            <div class="actions" style="margin-top:10px">
+              <button class="btn ghost small" id="cfGetKey">Получить ключ</button>
+              <button class="btn primary small" id="cfSaveKey">Проверить и сохранить</button>
+            </div>
+          </div>
           <div class="card">
             <h3>Игра</h3>
             <div class="row" style="margin-top:16px">

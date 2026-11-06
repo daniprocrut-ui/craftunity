@@ -116,14 +116,9 @@ def set_source_constants(repo: str) -> None:
         f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json",
         f"https://cdn.jsdelivr.net/gh/{repo}@main/docs/manifest.json",
     ]
-    raw = f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json"
-    raw_sig = f"https://raw.githubusercontent.com/{repo}/main/docs/manifest.json.sig"
     text = CONFIG_PATH.read_text(encoding="utf-8")
     text = re.sub(r'GITHUB_REPO = "[^"]*"', f'GITHUB_REPO = "{repo}"', text, count=1)
-    text = re.sub(r'DEFAULT_MANIFEST_URL = "[^"]*"', f'DEFAULT_MANIFEST_URL = "{raw}"', text, count=1)
-    text = re.sub(
-        r'DEFAULT_MANIFEST_SIG_URL = "[^"]*"', f'DEFAULT_MANIFEST_SIG_URL = "{raw_sig}"', text, count=1
-    )
+    text = re.sub(r'DEFAULT_MANIFEST_URL = "[^"]*"', f'DEFAULT_MANIFEST_URL = "{url}"', text, count=1)
     list_body = "".join(f'    "{item}",\n' for item in fallbacks)
     text = re.sub(
         r"MANIFEST_FALLBACKS: list\[str\] = \[[^\]]*\]",

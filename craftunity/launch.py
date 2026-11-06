@@ -9,7 +9,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from . import config, discovery, installer, state
+from . import config, discovery, installer, state, updater
 from .auth import ensure_authlib_injector, ely_validate
 from .manifest import fallback_urls, fetch_manifest, load_cached_manifest
 from .util import LauncherError, platform_token, rules_allow
@@ -33,6 +33,10 @@ class Engine:
         self.manifest_source = ""
         self.manifest_fetched_at = 0
         self._manifest_checked = 0.0
+        self._heartbeat_discovered: tuple[str, float] | None = None
+        self._content_signature = ""
+        self._content_sent_at = 0.0
+        self._launcher_started = int(time.time())
         self.plan: dict | None = None
         self.installed: dict | None = None
         self._thread: threading.Thread | None = None
@@ -80,6 +84,7 @@ class Engine:
     def refresh_manifest(self, force: bool = False) -> dict | None:
         settings = config.load_settings()
         url = settings.get("manifest_url", "")
+        sig_url = str(settings.get("manifest_sig_url") or "").strip()
         now = time.time()
         with self.lock:
             if (
@@ -90,56 +95,78 @@ class Engine:
             ):
                 return self.manifest
         self._manifest_checked = now
-        try:
-            manifest = fetch_manifest(url)
-        except LauncherError as exc:
-            manifest, fallback = self._fetch_fallbacks(url)
-            if manifest is not None:
-                with self.lock:
-                    self.manifest = manifest
-                    self.manifest_source = "fallback"
-                    self.manifest_fetched_at = int(time.time())
-                    self.manifest_error = ""
-                return manifest
-            manifest, found_url = self._auto_discover(url)
-            if manifest is not None:
-                url = found_url
-            else:
-                cached = load_cached_manifest()
-                if cached:
-                    manifest, meta = cached
-                    with self.lock:
-                        self.manifest = manifest
-                        self.manifest_source = "cache"
-                        self.manifest_fetched_at = int(meta.get("fetched_at") or 0)
-                        self.manifest_error = ""
-                    self._log(
-                        "[manifest] сервер недоступен, использую сохранённую версию "
-                        f"({self._format_ts(self.manifest_fetched_at)}): {exc}"
-                    )
-                    return manifest
-                with self.lock:
-                    self.manifest_error = str(exc)
-                    if self.manifest is None:
-                        self.manifest_source = "none"
-                return self.manifest
-        with self.lock:
-            self.manifest = manifest
-            self.manifest_source = "network"
-            self.manifest_fetched_at = int(time.time())
-            self.manifest_error = ""
-        return manifest
+        best, best_url, errors = self._fetch_best(url, sig_url=sig_url)
+        if best is not None:
+            source = "network" if best_url == url else "mirror"
+            with self.lock:
+                self.manifest = best
+                self.manifest_source = source
+                self.manifest_fetched_at = int(time.time())
+                self.manifest_error = ""
+            if source == "mirror":
+                self._log(f"[manifest] взял самую свежую копию: {best_url}")
+            return best
 
-    def _fetch_fallbacks(self, primary: str) -> tuple[dict | None, str]:
-        """Пробует зеркала манифеста, если основной адрес не ответил."""
-        for candidate in fallback_urls(primary):
+        manifest, found_url = self._auto_discover(url)
+        if manifest is not None:
+            with self.lock:
+                self.manifest = manifest
+                self.manifest_source = "network"
+                self.manifest_fetched_at = int(time.time())
+                self.manifest_error = ""
+            return manifest
+
+        cached = load_cached_manifest()
+        if cached:
+            manifest, meta = cached
+            with self.lock:
+                self.manifest = manifest
+                self.manifest_source = "cache"
+                self.manifest_fetched_at = int(meta.get("fetched_at") or 0)
+                self.manifest_error = ""
+            self._log(
+                "[manifest] источники недоступны, использую сохранённую версию "
+                f"({self._format_ts(self.manifest_fetched_at)}): {'; '.join(errors) or url}"
+            )
+            return manifest
+
+        with self.lock:
+            self.manifest_error = "; ".join(errors) or f"Нет ответа: {url}"
+            if self.manifest is None:
+                self.manifest_source = "none"
+        return self.manifest
+
+    def _manifest_sources(self, primary: str) -> list[str]:
+        sources: list[str] = []
+        for candidate in (primary, config.DEFAULT_MANIFEST_URL, *fallback_urls(primary)):
+            if isinstance(candidate, str) and candidate.startswith(("http://", "https://")) and candidate not in sources:
+                sources.append(candidate)
+        return sources
+
+    @staticmethod
+    def _freshness(manifest: dict) -> tuple:
+        block = (manifest or {}).get("launcher") or {}
+        updated = str((manifest or {}).get("updated_at") or "")
+        return (updated, updater.version_key(str(block.get("version") or "0")))
+
+    def _fetch_best(self, primary: str, timeout: int = 15, sig_url: str = "") -> tuple[dict | None, str, list[str]]:
+        """Опрашивает все адреса и берёт самый свежий манифест: зеркала отдают кэш."""
+        best: dict | None = None
+        best_url = ""
+        errors: list[str] = []
+        for candidate in self._manifest_sources(primary):
             try:
-                manifest = fetch_manifest(candidate)
-            except LauncherError:
+                manifest = fetch_manifest(
+                    candidate,
+                    timeout=timeout,
+                    sig_url=sig_url if candidate == primary else "",
+                )
+            except LauncherError as exc:
+                errors.append(str(exc))
                 continue
-            self._log(f"[manifest] основной адрес недоступен, беру зеркало: {candidate}")
-            return manifest, candidate
-        return None, ""
+            if best is None or self._freshness(manifest) > self._freshness(best):
+                best, best_url = manifest, candidate
+        return best, best_url, errors
 
     def _auto_discover(self, preferred: str) -> tuple[dict | None, str]:
         candidates: list[str] = []
@@ -314,6 +341,7 @@ class Engine:
                     f"Найдена Java {major or '—'}, а для Minecraft {info['version']} нужна Java {required}+."
                 )
             self._set("starting", "launch", 0.97, "Запуск Minecraft…")
+            self.started_at = time.time()
             command = self.build_command(account, java)
             log_path = Path(config.game_dir()) / "logs" / f"craftunity-{time.strftime('%Y%m%d-%H%M%S')}.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -380,37 +408,141 @@ class Engine:
             }
         )
 
-    def _heartbeat_target(self) -> str:
+    @staticmethod
+    def _endpoint(url: str) -> str:
+        """Приводит адрес к .../heartbeat: в настройках и манифесте часто указан только домен."""
+        parsed = urllib.parse.urlparse(str(url or "").strip())
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return ""
+        path = parsed.path.rstrip("/")
+        if not path:
+            path = "/heartbeat"
+        return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, path, "", parsed.query, ""))
+
+    def _heartbeat_target(self, discovered: bool = True) -> str:
+        """Сначала внешний приёмник, затем админка в локальной сети."""
         settings = config.load_settings()
         url = (settings.get("heartbeat_url") or "").strip()
         if url:
-            return url
+            return self._endpoint(url)
+        published = str((self.manifest or {}).get("heartbeat_url") or "").strip()
+        if published.startswith(("http://", "https://")):
+            return self._endpoint(published)
+        found = self._discover_heartbeat() if discovered else ""
+        if found:
+            return found
         manifest_url = (settings.get("manifest_url") or "").strip()
         parsed = urllib.parse.urlparse(manifest_url)
-        if parsed.scheme in ("http", "https") and parsed.netloc:
+        if (
+            parsed.scheme in ("http", "https")
+            and parsed.netloc
+            and not parsed.netloc.endswith("github.io")
+        ):
             return f"{parsed.scheme}://{parsed.netloc}/heartbeat"
         return ""
 
-    def _heartbeat(self, info: dict) -> None:
-        url = self._heartbeat_target()
-        if not url:
-            return
+    def _heartbeat_fallbacks(self, url: str) -> list[str]:
+        """Куда отправить присутствие, если основной приёмник не отвечает."""
+        targets: list[str] = []
+        local = self._discover_heartbeat(force=True)
+        if local and local != url:
+            targets.append(local)
+        settings = config.load_settings()
+        manifest_url = (settings.get("manifest_url") or "").strip()
+        parsed = urllib.parse.urlparse(manifest_url)
+        if parsed.scheme in ("http", "https") and parsed.netloc and "dropbox.com" not in parsed.netloc:
+            own = f"{parsed.scheme}://{parsed.netloc}/heartbeat"
+            if own not in targets and own != url:
+                targets.append(own)
+        return targets
+
+    def _discover_heartbeat(self, force: bool = False) -> str:
+        """Адрес админки из UDP-маяка: работает при любой смене LAN-адреса."""
+        now = time.time()
+        if not force and self._heartbeat_discovered:
+            url, stamp = self._heartbeat_discovered
+            if now - stamp < 600:
+                return url
+        found = discovery.discover(timeout=1.5)
+        target = ""
+        if found:
+            parsed = urllib.parse.urlparse(found)
+            if parsed.scheme in ("http", "https") and parsed.netloc:
+                target = f"{parsed.scheme}://{parsed.netloc}/heartbeat"
+        self._heartbeat_discovered = (target, now) if target else None
+        return target
+
+    def _post_heartbeat(self, url: str, payload: dict) -> bool:
         try:
             from .util import http_json
 
-            http_json(
-                url,
-                payload={
-                    "instance_id": state.instance_id(),
-                    "version": info.get("version"),
-                    "loader": info.get("loader"),
-                    "username": (state.current_account() or {}).get("username"),
-                },
-                method="POST",
-                timeout=8,
-            )
+            http_json(url, payload=payload, method="POST", timeout=8)
+            return True
         except Exception:
-            pass
+            return False
+
+    def _content_snapshot(self) -> list[dict]:
+        """Состав модов, ресурспаков и шейдеров для админки: только названия, тип и флаг."""
+        from . import mods as mods_module
+
+        items = mods_module.installed_all().get("items") or []
+        result = []
+        for item in items:
+            kind = item.get("kind") or "mod"
+            title = str(item.get("title") or item.get("slug") or item.get("filename") or "").strip()
+            if not title:
+                continue
+            result.append({"title": title[:80], "kind": kind, "disabled": bool(item.get("disabled"))})
+        result.sort(key=lambda entry: (entry["kind"], entry["title"].lower()))
+        return result[:400]
+
+    def _content_for_heartbeat(self) -> list[dict] | None:
+        """Состав отправляется при изменении и не чаще раза в 30 минут."""
+        try:
+            snapshot = self._content_snapshot()
+        except Exception:
+            return None
+        import hashlib
+        import json as json_module
+
+        signature = hashlib.sha1(
+            json_module.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        now = time.time()
+        if self._content_signature == signature and now - self._content_sent_at < 1800:
+            return None
+        self._content_signature = signature
+        self._content_sent_at = now
+        return snapshot
+
+    def _heartbeat(self, info: dict) -> None:
+        account = state.current_account() or {}
+        username = account.get("username")
+        icon = ""
+        if username:
+            icon = "https://skinsystem.ely.by/skins/" + urllib.parse.quote(str(username))
+        payload = {
+            "instance_id": state.instance_id(),
+            "version": info.get("version"),
+            "loader": info.get("loader"),
+            "username": username,
+            "icon": icon,
+            "started": self._launcher_started,
+            "game_started": int(self.started_at or 0),
+            "in_game": bool(self.process and self.process.poll() is None),
+            "launched": bool(self.started_at),
+        }
+        content = self._content_for_heartbeat()
+        if content is not None:
+            payload["content"] = content
+        url = self._heartbeat_target()
+        if not url:
+            return
+        if self._post_heartbeat(url, payload):
+            return
+        for fallback in self._heartbeat_fallbacks(url):
+            if self._post_heartbeat(fallback, payload):
+                return
 
     # ---------------------------------------------------------------- command
 

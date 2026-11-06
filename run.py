@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -115,19 +116,137 @@ def wait_for_previous(timeout: float = 8.0) -> None:
 
 def maybe_apply_update() -> None:
     current = server.ENGINE.manifest
-    if not current:
+    if not current or updater.just_applied():
         return
     result = updater.check(current)
-    if result.get("state") != "staged" or not updater.should_block(current):
+    if result.get("state") != "staged":
         return
     process = getattr(server.ENGINE, "process", None)
     if process is not None and process.poll() is None:
         return
+    if getattr(server.ENGINE, "status", "") in ("installing", "launching"):
+        return
+    if updater.schedule_apply():
+        clear_lock()
+        os._exit(0)
     if updater.apply_pending(["--updated"]):
+        clear_lock()
         os._exit(0)
 
 
+def pack_signature(manifest: dict | None) -> str:
+    items = sorted(
+        str(entry.get("project_id") or entry.get("slug") or "")
+        for entry in ((manifest or {}).get("mods") or [])
+    )
+    return "|".join(part for part in items if part)
+
+
+def sync_pack_mods(tracker: dict) -> None:
+    """Доставляет моды модпака в фоне, когда список в манифесте изменился."""
+    from craftunity import mods as mods_module
+
+    manifest = server.ENGINE.manifest
+    if not manifest:
+        return
+    signature = pack_signature(manifest)
+    if not signature or signature == tracker.get("value"):
+        return
+    process = getattr(server.ENGINE, "process", None)
+    if process is not None and process.poll() is None:
+        return
+    if getattr(server.ENGINE, "status", "") in ("starting", "installing", "launching", "running"):
+        return
+    game = manifest.get("game") or {}
+    version = game.get("version") or config.load_settings().get("game_version")
+    result = mods_module.sync_manifest_mods(manifest, version, "fabric")
+    failed = [item for item in result if item.get("error")]
+    tracker["value"] = signature
+    server.ENGINE._log(f"[mods] модпак обновлён в фоне: {len(result)} мод(ов), ошибок {len(failed)}")
+
+
+def startup_update_check(timeout: float = 8.0) -> None:
+    """Проверяет обновление сразу при запуске, не дожидаясь минутного цикла."""
+    finished = threading.Event()
+
+    def work() -> None:
+        try:
+            server.ENGINE.refresh_manifest()
+            maybe_apply_update()
+        except Exception:
+            pass
+        finally:
+            finished.set()
+
+    threading.Thread(target=work, daemon=True).start()
+    finished.wait(timeout)
+
+
+def webview2_available() -> bool:
+    """Есть ли рантайм Edge WebView2: без него окно webview остаётся пустым."""
+    if os.name != "nt":
+        return True
+    try:
+        import winreg
+
+        keys = (
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+        )
+        for root, path in keys:
+            try:
+                with winreg.OpenKey(root, path) as key:
+                    version = str(winreg.QueryValueEx(key, "pv")[0] or "").strip()
+                if version and version != "0.0.0.0":
+                    return True
+            except OSError:
+                continue
+    except Exception:
+        return True
+    return False
+
+
+def temp_problem() -> str:
+    """Проверяет, сможет ли распаковка сборки работать во временной папке."""
+    folder = os.environ.get("TEMP") or os.environ.get("TMP") or ""
+    if not folder:
+        return "Windows не сообщает путь к временной папке (%TEMP%)."
+    try:
+        probe = os.path.join(folder, "craftunity-write-test.tmp")
+        with open(probe, "w", encoding="utf-8") as handle:
+            handle.write("ok")
+        os.remove(probe)
+    except OSError:
+        return f"Нет прав на запись во временную папку:\n{folder}"
+    try:
+        free = shutil.disk_usage(folder).free
+    except OSError:
+        return ""
+    if free < 200 * 1024 * 1024:
+        return f"Мало места для распаковки (свободно {free // (1024 * 1024)} МБ) во временной папке:\n{folder}"
+    return ""
+
+
+def show_problem(title: str, text: str) -> None:
+    """Показывает понятное окно вместо системной ошибки LoadLibrary."""
+    if os.environ.get("CRAFTUNITY_HEADLESS") == "1":
+        print(text, file=sys.stderr)
+        return
+    if os.name != "nt":
+        print(text, file=sys.stderr)
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, text, title, 0x10)
+    except Exception:
+        print(text, file=sys.stderr)
+
+
 def run_window(url: str) -> bool:
+    if not webview2_available():
+        return False
     try:
         import webview  # type: ignore
     except Exception:
@@ -158,6 +277,17 @@ def main() -> int:
     args = parser.parse_args()
 
     config.seed_from_portable()
+
+    if not args.prepare_keys and getattr(sys, "frozen", False):
+        trouble = temp_problem()
+        if trouble:
+            show_problem(
+                "Craftunity Launcher",
+                trouble
+                + "\n\nДобавьте папку во исключения антивируса Microsoft Defender\n"
+                "или используйте сборку «без распаковки» (папка Craftunity) с сайта.",
+            )
+            return 1
 
     if args.prepare_keys:
         path = manifest_module.ensure_admin_keys()
@@ -192,10 +322,11 @@ def main() -> int:
         return 0
     updater.cleanup_old()
 
-    existing = existing_instance()
-    if existing:
-        notify_running(existing)
-        return 0
+    if os.environ.get("CRAFTUNITY_SINGLE") == "1":
+        existing = existing_instance()
+        if existing:
+            notify_running(existing)
+            return 0
 
     httpd, port = server.serve(args.port, mode="client", host=args.host)
     write_lock(port)
@@ -205,19 +336,36 @@ def main() -> int:
         print("Локальный API не запустился", file=sys.stderr)
         return 1
 
-    # Манифест, heartbeat и тихое обновление: при старте и далее каждые 5 минут
+    startup_update_check()
+
+    # Манифест, heartbeat, модпак и тихое обновление: при старте и далее раз в минуту
+    mods_tracker = {"value": ""}
+
     def _presence_loop():
+        # первый проход сразу: лаунчер сообщает о себе, не дожидаясь минуты
+        first = True
         while True:
             try:
                 server.ENGINE.refresh_manifest()
                 server.ENGINE.report_presence()
             except Exception:
                 pass
+            if first:
+                first = False
+                continue
             try:
                 maybe_apply_update()
             except Exception:
                 pass
-            time.sleep(300)
+            try:
+                sync_pack_mods(mods_tracker)
+            except Exception:
+                pass
+            try:
+                updater.cleanup_old(attempts=1, delay=0)
+            except Exception:
+                pass
+            time.sleep(max(15, int(config.MANIFEST_REFRESH_SECONDS)))
 
     threading.Thread(target=_presence_loop, daemon=True).start()
 

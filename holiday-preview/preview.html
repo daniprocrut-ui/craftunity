@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Праздничное оформление — превью</title>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161c26; --line: #26303f; --fg: #e8eef7;
+    --muted: #93a2b8; --accent-default: #4c8dff; --chip-bg: #1d2634;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 26px; background: var(--bg); color: var(--fg); font-family: "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  .note { color: var(--muted); font-size: 12.5px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .panel {
+    position: relative; overflow: hidden; min-height: 300px; padding: 18px;
+    border: 1px solid var(--line); border-radius: 18px; background: var(--card);
+    --accent: #4c8dff; --holiday-color: #cfe6ff;
+  }
+  .panel::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+  }
+  .layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .piece { position: absolute; background: var(--holiday-color); opacity: .6; }
+  .shape-flake { border-radius: 50%; box-shadow: 0 0 6px rgba(255,255,255,.55); }
+  .shape-dot { border-radius: 50%; }
+  .shape-pumpkin { background: transparent url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMwIDdoNGwxIDExaC02eiIgZmlsbD0iIzVmOGEzYSIvPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjQwIiByeD0iMjQiIHJ5PSIyMCIgZmlsbD0iI2YyOTEzYSIvPjxlbGxpcHNlIGN4PSIxOCIgY3k9IjQwIiByeD0iMTEiIHJ5PSIxOCIgZmlsbD0iI2RkNzYyMiIvPjxlbGxpcHNlIGN4PSI0NiIgY3k9IjQwIiByeD0iMTEiIHJ5PSIxOCIgZmlsbD0iI2RkNzYyMiIvPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjQwIiByeD0iNyIgcnk9IjE5IiBmaWxsPSIjZmZiMTU4Ii8+PHBhdGggZD0iTTIwIDMxbDggNi05IDF6IiBmaWxsPSIjM2ExZDBhIi8+PHBhdGggZD0iTTQ0IDMxbC04IDYgOSAxeiIgZmlsbD0iIzNhMWQwYSIvPjxwYXRoIGQ9Ik0yMSA0N2MzIDQgNyA2IDExIDZzOC0yIDExLTZjLTQgMi03IDMtMTEgM3MtNy0xLTExLTN6IiBmaWxsPSIjM2ExZDBhIi8+PC9zdmc+") center / contain no-repeat; }
+  .shape-star { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+  .shape-petal { border-radius: 50% 0 50% 0; }
+  .shape-leaf { border-radius: 0 100% 0 100%; }
+  .content { position: relative; display: flex; flex-direction: column; gap: 10px; }
+  .hero {
+    display: flex; gap: 14px; align-items: center; padding: 12px;
+    border-radius: 14px; box-shadow: inset 0 0 44px -22px var(--accent); background: rgba(255,255,255,.02);
+  }
+  .avatar {
+    width: 56px; height: 56px; border-radius: 14px; background: var(--chip-bg);
+    border: 1px solid var(--line); display: grid; place-items: center; font-weight: 700; color: var(--accent);
+  }
+  .name { font-size: 15px; font-weight: 700; }
+  .type { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .chip.accent { border-color: var(--accent); color: var(--accent); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: auto;
+    padding: 10px 16px; border-radius: 12px; border: 0; font-size: 13px; font-weight: 700;
+    background: var(--accent); color: #08101c;
+  }
+  .ghost { background: transparent; border: 1px solid var(--line); color: var(--fg); font-weight: 600; }
+  .title { font-size: 13.5px; font-weight: 700; }
+  .sub { color: var(--muted); font-size: 11.5px; }
+  .row { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<h1>Праздничное оформление Craftunity</h1>
+<div class="note">Превью эффектов: акцент, баннер события и частицы. В лаунчере частицы летят сверху вниз; здесь показаны в статике для скриншота.</div>
+<div class="grid" id="grid"></div>
+<script>
+  const THEMES = [
+    { id: "newyear", title: "Новый год", accent: "#5aa9ff", color: "#d9ecff", shape: "flake", count: 26 },
+    { id: "halloween", title: "Хэллоуин", accent: "#ff8a2b", color: "#ffb066", shape: "pumpkin", count: 14 },
+    { id: "feb23", title: "23 февраля", accent: "#7fa86b", color: "#b7d3a2", shape: "star", count: 16 },
+    { id: "march8", title: "8 марта", accent: "#ff7ab6", color: "#ffc2de", shape: "petal", count: 20 },
+    { id: "september1", title: "1 сентября", accent: "#c9a227", color: "#f0d072", shape: "leaf", count: 16 },
+  ];
+
+  function build(theme) {
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.style.setProperty("--accent", theme.accent);
+    panel.style.setProperty("--holiday-color", theme.color);
+
+    const layer = document.createElement("div");
+    layer.className = "layer";
+    for (let i = 0; i < theme.count; i += 1) {
+      const piece = document.createElement("span");
+      piece.className = "piece shape-" + theme.shape;
+      const base = theme.shape === "pumpkin" ? 14 : 5;
+      const size = base + Math.round(Math.random() * 7);
+      piece.style.width = size + "px";
+      piece.style.height = size + "px";
+      piece.style.left = Math.round(Math.random() * 96) + "%";
+      piece.style.top = Math.round(Math.random() * 94) + "%";
+      piece.style.opacity = (0.3 + Math.random() * 0.45).toFixed(2);
+      layer.appendChild(piece);
+    }
+
+    const content = document.createElement("div");
+    content.className = "content";
+    content.innerHTML = `
+      <div class="hero">
+        <div class="avatar">C</div>
+        <div>
+          <div class="name">${theme.title}</div>
+          <div class="type">Оффлайн-аккаунт</div>
+          <div class="chips">
+            <span class="chip">Версия <b>26.2</b></span>
+            <span class="chip">Модов <b>6</b></span>
+            <span class="chip accent">${theme.title}</span>
+          </div>
+        </div>
+      </div>
+      <div class="title">Сборка готова к запуску</div>
+      <div class="sub">Акцент темы: ${theme.accent}</div>
+      <div class="row">
+        <button class="btn">Играть</button>
+        <button class="btn ghost">Настройки</button>
+      </div>`;
+
+    panel.appendChild(layer);
+    panel.appendChild(content);
+    return panel;
+  }
+
+  const grid = document.getElementById("grid");
+  THEMES.forEach((theme) => grid.appendChild(build(theme)));
+</script>
+</body>
+</html>

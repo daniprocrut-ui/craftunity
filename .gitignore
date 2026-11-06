@@ -7,13 +7,21 @@ dist/
 venv/
 *.log
 
-# Local Netlify folder
+# Local Netlify / Wrangler
 .netlify
+.wrangler/
+
+# Node
+node_modules/
 
 # Секреты и локальные ссылки
 dropbox_token.txt
 dropbox_links.json
 .data/
 
-# Собранные exe в документации публикуются отдельно через Releases
+# Артефакты сборки модов
+mods/craftunity-menu/.gradle/
+mods/craftunity-menu/build/
+
+# Собранные exe в документации публикуются через Releases
 docs/launcher/**/*.exe

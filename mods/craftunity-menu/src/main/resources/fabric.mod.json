@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "craftunity_menu",
+	"version": "${version}",
+	"name": "Craftunity Menu",
+	"description": "Оформляет меню Minecraft в стиле Craftunity Launcher: тёмный фон, оранжевый акцент, логотип и кнопки лаунчера. Работает поверх FancyMenu.",
+	"authors": [
+		"Craftunity"
+	],
+	"contact": {
+		"homepage": "https://github.com/daniprocrut-ui/craftunity",
+		"sources": "https://github.com/daniprocrut-ui/craftunity"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/craftunity_menu/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.craftunity.menu.CraftunityMenuClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fancymenu": ">=3.9.0"
+	},
+	"custom": {
+		"modmenu": {
+			"badges": [
+				"client"
+			]
+		}
+	}
+}

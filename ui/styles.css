@@ -634,6 +634,7 @@ textarea { resize: vertical; min-height: 76px; font-family: ui-monospace, Consol
 .mod .title { font-size: 13.5px; font-weight: 600; }
 .mod .desc { font-size: 11.5px; color: var(--muted); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
 .mod .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.mod .author { font-size: 11px; color: var(--muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mod .stat { font-size: 11px; color: #6d7588; }
 .mod-body { min-width: 0; flex: 1; }
 
@@ -710,6 +711,9 @@ code { background: #0e1220; border: 1px solid var(--line); padding: 2px 6px; bor
 .project-head img { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; background: #0e1220; }
 .project-title { font-size: 22px; font-weight: 700; }
 .project-sub { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.project-authors { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.project-authors .author-link { color: var(--accent); text-decoration: none; }
+.project-authors .author-link:hover { text-decoration: underline; }
 .gallery { display: flex; gap: 10px; overflow-x: auto; padding: 4px 0 12px; margin-top: 16px; }
 .gallery img { height: 160px; border-radius: 12px; border: 1px solid var(--line); }
 .gallery-empty, .body-empty { color: var(--muted); font-size: 12.5px; }
@@ -744,3 +748,56 @@ code { background: #0e1220; border: 1px solid var(--line); padding: 2px 6px; bor
 .installed-icon.placeholder { display: grid; place-items: center; font-size: 24px; font-weight: 700; color: var(--accent); background: var(--chip-bg); border: 1px solid var(--line); }
 .installed-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; word-break: break-word; }
 .installed-meta { font-size: 11.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; justify-content: center; }
+.installed-desc { font-size: 11.5px; color: var(--muted); line-height: 1.35; text-align: left; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---------------------------------------------------- праздничное оформление */
+[data-holiday="newyear"] { --accent: #5aa9ff; --holiday-color: #d9ecff; }
+[data-holiday="halloween"] { --accent: #ff8a2b; --holiday-color: #ffb066; }
+[data-holiday="feb23"] { --accent: #7fa86b; --holiday-color: #b7d3a2; }
+[data-holiday="march8"] { --accent: #ff7ab6; --holiday-color: #ffc2de; }
+[data-holiday="september1"] { --accent: #c9a227; --holiday-color: #f0d072; }
+
+.holiday-layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.holiday-piece {
+  position: absolute;
+  top: -6vh;
+  width: 7px;
+  height: 7px;
+  background: var(--holiday-color, #cfe6ff);
+  opacity: .55;
+  animation-name: holiday-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.holiday-piece.still { animation: none; top: var(--holiday-top, 45%); }
+.holiday-piece.shape-flake { border-radius: 50%; box-shadow: 0 0 6px rgba(255, 255, 255, .45); }
+.holiday-piece.shape-dot { border-radius: 50%; }
+.holiday-piece.shape-pumpkin {
+  background: transparent url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMwIDdoNGwxIDExaC02eiIgZmlsbD0iIzVmOGEzYSIvPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjQwIiByeD0iMjQiIHJ5PSIyMCIgZmlsbD0iI2YyOTEzYSIvPjxlbGxpcHNlIGN4PSIxOCIgY3k9IjQwIiByeD0iMTEiIHJ5PSIxOCIgZmlsbD0iI2RkNzYyMiIvPjxlbGxpcHNlIGN4PSI0NiIgY3k9IjQwIiByeD0iMTEiIHJ5PSIxOCIgZmlsbD0iI2RkNzYyMiIvPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjQwIiByeD0iNyIgcnk9IjE5IiBmaWxsPSIjZmZiMTU4Ii8+PHBhdGggZD0iTTIwIDMxbDggNi05IDF6IiBmaWxsPSIjM2ExZDBhIi8+PHBhdGggZD0iTTQ0IDMxbC04IDYgOSAxeiIgZmlsbD0iIzNhMWQwYSIvPjxwYXRoIGQ9Ik0yMSA0N2MzIDQgNyA2IDExIDZzOC0yIDExLTZjLTQgMi03IDMtMTEgM3MtNy0xLTExLTN6IiBmaWxsPSIjM2ExZDBhIi8+PC9zdmc+") center / contain no-repeat;
+  box-shadow: none;
+}
+.holiday-piece.shape-star {
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+.holiday-piece.shape-petal { border-radius: 50% 0 50% 0; }
+.holiday-piece.shape-leaf { border-radius: 0 100% 0 100%; }
+@keyframes holiday-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(112vh); }
+}
+.no-motion .holiday-piece { animation: none; top: var(--holiday-top, 45%); }
+.holiday-chip { border-color: var(--accent); color: var(--accent); }
+[data-holiday] .hero { box-shadow: inset 0 0 44px -22px var(--accent); border-radius: 18px; }
+[data-holiday] .app::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
+  z-index: 0;
+}
+
+.installed-actions { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 2px; }
+.installed-item.is-off { opacity: 0.62; }
+.installed-item.is-off .installed-icon { filter: grayscale(0.75); }
+.chip.off { background: var(--chip-bg); color: var(--muted); border: 1px dashed var(--line); }

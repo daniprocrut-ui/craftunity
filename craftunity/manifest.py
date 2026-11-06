@@ -33,6 +33,7 @@ DEFAULT_MANIFEST = {
     "jvm": {"args": ["-Xmx4G", "-XX:+UseG1GC"], "java": ""},
     "mods": [],
     "min_launcher": "1.0.0",
+    "heartbeat_url": "",
     "launcher": {
         "version": "",
         "url": "",
@@ -155,16 +156,16 @@ def load_cached_manifest() -> tuple[dict, dict] | None:
     return manifest, {"fetched_at": int(data.get("fetched_at") or 0), "url": data.get("url") or ""}
 
 
-def fetch_manifest(url: str, timeout: int = 20, verify: bool = True) -> dict:
+def fetch_manifest(url: str, timeout: int = 20, verify: bool = True, sig_url: str = "") -> dict:
     body_url = url
-    sig_url = url + ".sig"
+    signature_url = sig_url or (url + ".sig")
     request_body = _raw(body_url, timeout)
     if not verify:
         try:
             return json.loads(request_body.decode("utf-8"))
         except ValueError as exc:
             raise LauncherError("Манифест лаунчера не является корректным JSON.") from exc
-    signature = _raw(sig_url, timeout).strip()
+    signature = _raw(signature_url, timeout).strip()
     manifest = verify_manifest(request_body, signature)
     save_cached_manifest(request_body, signature, url)
     return manifest
@@ -194,20 +195,81 @@ def _raw(url: str, timeout: int) -> bytes:
         raise LauncherError(f"Манифест недоступен ({url}): {exc.reason}") from exc
 
 
-def manifest_for_admin() -> dict:
+def _server_manifest() -> dict | None:
+    """Опубликованный манифест из папки сервера, если его подпись сходится."""
+    from . import dropbox
+
+    target = dropbox.server_dir()
+    if target is None:
+        return None
+    body_path = target / "manifest.json"
+    sig_path = target / "manifest.json.sig"
+    if not body_path.exists() or not sig_path.exists():
+        return None
+    try:
+        return verify_manifest(body_path.read_bytes(), sig_path.read_text(encoding="utf-8").strip())
+    except (LauncherError, OSError):
+        return None
+
+
+def published_manifest() -> dict | None:
+    """Манифест, который сейчас раздаётся клиентам, — копия в папке сервера."""
+    return _server_manifest()
+
+
+def _mine() -> dict | None:
     store = config.data_dir() / "admin" / "manifest.json"
-    if store.exists():
-        try:
-            return json.loads(store.read_text(encoding="utf-8"))
-        except ValueError:
-            pass
+    if not store.exists():
+        return None
+    try:
+        return json.loads(store.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+
+
+def manifest_for_admin() -> dict:
+    """Берём более свежий манифест: локальный или уже опубликованный в папке сервера."""
+    local = _mine()
+    remote = _server_manifest()
+    if remote is not None:
+        if local is None or str(remote.get("updated_at") or "") > str(local.get("updated_at") or ""):
+            try:
+                config.save_json(config.data_dir() / "admin" / "manifest.json", remote)
+            except OSError:
+                pass
+            return remote
+        return local
+    if local is not None:
+        return local
     manifest = json.loads(json.dumps(DEFAULT_MANIFEST))
     manifest["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     save_admin_manifest(manifest)
     return manifest
 
 
+def _version_key(value: str) -> tuple:
+    parts = []
+    for chunk in str(value or "").replace("-", ".").split("."):
+        parts.append(int(chunk) if chunk.isdigit() else 0)
+    return tuple(parts)
+
+
 def save_admin_manifest(manifest: dict) -> dict:
+    from . import dropbox
+
+    link = dropbox.launcher_url()
+    if link:
+        block = dict(manifest.get("launcher") or {})
+        block["url"] = link
+        manifest["launcher"] = block
+    remote = _server_manifest()
+    if remote:
+        published = remote.get("launcher") or {}
+        incoming = manifest.get("launcher") or {}
+        if _version_key(published.get("version")) > _version_key(incoming.get("version")):
+            merged = dict(incoming)
+            merged.update({key: value for key, value in published.items() if key in ("version", "url", "mirrors", "sha256", "notes")})
+            manifest["launcher"] = merged
     manifest["schema"] = MANIFEST_SCHEMA
     manifest["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     store = config.data_dir() / "admin" / "manifest.json"

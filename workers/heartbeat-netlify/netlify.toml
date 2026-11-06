@@ -1,0 +1,21 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/heartbeat"
+  to = "/.netlify/functions/heartbeat"
+  status = 200
+
+[[redirects]]
+  from = "/clients"
+  to = "/.netlify/functions/heartbeat"
+  status = 200
+
+[[redirects]]
+  from = "/manifest"
+  to = "/.netlify/functions/heartbeat"
+  status = 200

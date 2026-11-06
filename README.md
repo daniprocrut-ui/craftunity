@@ -17,7 +17,7 @@
 | Автовход на сервер | `--quickPlayMultiplayer craftunity.mcsh.io:25565` |
 | Heartbeat | клиент сообщает админке свою версию и ник |
 | Автообновление | новый exe берётся из подписанного манифеста, проверяется по sha256 и подменяется при следующем запуске |
-| Сайт загрузки | статическая страница `docs/index.html` для GitHub Pages, файлы — в GitHub Releases |
+| Сайт загрузки | статическая страница `docs/index.html` для GitHub Pages, файлы — в той же папке `docs/launcher/<версия>/` |
 
 ## Быстрый старт
 
@@ -60,9 +60,12 @@ python tests\updater_check.py  # проверка логики обновлен�
 1. Админ задаёт параметры сборки и публикует манифест.
 2. Манифест подписывается приватным ключом `%APPDATA%\Craftunity\admin\manifest_private.pem`.
 3. Публикуются два файла: `manifest.json` и `manifest.json.sig` (папка `%APPDATA%\Craftunity\admin\publish`),
-   а `tools\release.py` кладёт их в `docs/` и вместе с exe отправляет на GitHub.
-4. Лаунчер скачивает их с GitHub Pages, проверяет подпись встроенным публичным ключом
+   а `tools\release.py` кладёт их в `docs/` и туда же — сборку `docs\launcher\<версия>\Craftunity_launcher.exe`.
+4. Лаунчер скачивает манифест с GitHub Pages, проверяет подпись встроенным публичным ключом
    (`keys\craftunity_manifest_pub.pem`) и только потом ставит клиент и модпак.
+
+Папка `docs/` — это и есть папка на сервере: GitHub Pages раздаёт её целиком, поэтому манифест
+и все версии лаунчера лежат рядом и обновляются одним коммитом.
 
 Адрес манифеста зашит в сборку: `DEFAULT_MANIFEST_URL` в `craftunity/config.py` переписывается
 скриптом релиза на `https://<user>.github.io/<repo>/manifest.json`, поэтому игроку ничего
@@ -79,7 +82,8 @@ python tests\updater_check.py  # проверка логики обновлен�
 ```json
 "launcher": {
   "version": "1.1.0",
-  "url": "https://…/Craftunity_launcher.exe",
+  "url": "https://<user>.github.io/<repo>/launcher/1.1.0/Craftunity_launcher.exe",
+  "mirrors": ["https://github.com/<user>/<repo>/releases/download/v1.1.0/Craftunity_launcher.exe"],
   "sha256": "…",
   "notes": "что нового",
   "mandatory": false
@@ -104,9 +108,11 @@ python tests\updater_check.py  # проверка логики обновлен�
 
 * Локально/в одной сети: включите сервер на вкладке «Публикация», скопируйте URL вида
   `http://192.168.1.10:8765/launcher/manifest.json` и вставьте его в настройках лаунчера.
-* Для интернета: манифест и exe публикуются на GitHub Pages + GitHub Releases
-  (`python tools\release.py <версия>`), лаунчер получает адрес вида
-  `https://<user>.github.io/<repo>/manifest.json`.
+* Для интернета: `docs/` раздаётся через GitHub Pages — манифест, подпись и сборки лаунчера
+  лежат в одной папке (`python tools\release.py <версия>`), адрес вида
+  `https://<user>.github.io/<repo>/manifest.json`, файлы — `…/launcher/<версия>/Craftunity_launcher.exe`.
+  GitHub Releases остаётся зеркалом: если Pages не ответил, лаунчер возьмёт тот же exe оттуда
+  (`launcher.mirrors` в манифесте).
 
 `craftunity.mcsh.io` — адрес игрового сервера, а не веб-сервер: по 80/443 он не отвечает,
 поэтому статику (сайт, exe, манифест) там разместить нельзя, нужен отдельный HTTPS-хостинг.
@@ -168,10 +174,12 @@ python tools\release.py 1.1.0 --notes "Что нового" --repo <user>/<repo>
 
 Скрипт прописывает в `craftunity/config.py` адрес манифеста на GitHub Pages, зеркала
 (`MANIFEST_FALLBACKS`) и `GITHUB_REPO`, поднимает `LAUNCHER_VERSION`, собирает `Craftunity_launcher.spec`,
-считает sha256, заливает exe в GitHub Releases (`gh release create`), вписывает блок `launcher`
-в манифест, подписывает его, копирует `manifest.json` и `.sig` в `docs/`, обновляет ссылку на
-релизы в `docs/index.html` и коммитит изменения. `--dry-run` показывает план без изменений,
-`--no-upload` и `--skip-build` — для отладки, `--no-commit` — если коммит нужен вручную.
+считает sha256, кладёт exe в папку сервера `docs\launcher\<версия>\`, дополнительно заливает его
+в GitHub Releases (`gh release create`) как зеркало, вписывает блок `launcher` в манифест,
+подписывает его, копирует `manifest.json` и `.sig` в `docs/`, обновляет ссылку на релизы
+в `docs/index.html` и коммитит изменения. В `docs\launcher\` остаются две последние сборки —
+старые папки скрипт удаляет, чтобы сайт не разрастался. `--dry-run` показывает план без изменений,
+`--no-upload` (без зеркала) и `--skip-build` — для отладки, `--no-commit` — если коммит нужен вручную.
 
 Первая настройка хостинга:
 
@@ -211,6 +219,45 @@ python tools\release.py 1.1.0 --notes "Что нового" --repo <user>/<repo>
 
 Требования у получателя: Windows 10/11 x64 и интернет. SmartScreen может предупредить,
 что издатель неизвестен — это ожидаемо для неподписанного exe (подпись требует сертификата кода).
+
+## Сервер на Dropbox
+
+Папка сервера лежит в Dropbox и синхронизируется клиентом Dropbox — отдельный хостинг не нужен.
+
+```
+%USERPROFILE%\Dropbox\craftunity\
+  manifest.json
+  manifest.json.sig
+  settings.json
+  launcher\Craftunity_launcher.exe          (постоянное имя — постоянная ссылка)
+  launcher\archive\<версия>\Craftunity_launcher.exe
+```
+
+Раскладка и обновление:
+
+```powershell
+python tools\dropbox_publish.py            # разложить manifest + sig + settings + exe
+python tools\dropbox_publish.py --apply    # записать ссылки из dropbox_links.json в config.py
+```
+
+Ссылки создаются один раз вручную: ПКМ по файлу → «Копировать ссылку Dropbox», затем заменить
+`dl=0` на `dl=1` и вставить в `dropbox_links.json`. Перезапись файла сохраняет ссылку, поэтому
+дальше менять её не нужно — но файл нельзя удалять и заливать заново, иначе ссылка станет новой.
+Манифест и подпись лежат разными файлами, поэтому в лаунчере есть отдельная настройка
+`manifest_sig_url` (в `config.py` — `DEFAULT_MANIFEST_SIG_URL`).
+
+«Информация о пользователях» пишется в Dropbox не лаунчером, а прокси — функцией Netlify
+`workers/heartbeat-netlify`. В её переменные окружения добавляются:
+
+* `DROPBOX_TOKEN` — токен приложения Dropbox с правами `files.content.read` и `files.content.write`;
+* `DROPBOX_USERS_PATH` — путь к файлу, по умолчанию `/craftunity/users.json`;
+* `READ_TOKEN` — как раньше, для `GET /clients`.
+
+Без `DROPBOX_TOKEN` функция продолжает писать в Netlify Blobs, поэтому старая схема не ломается.
+
+Ограничения Dropbox: сайт не может читать файлы напрямую из-за CORS (нужен прокси),
+бесплатный тариф — 2 ГБ, а каждый heartbeat целиком перезаписывает `users.json`, так что схема
+рассчитана на десятки игроков, а не на тысячи.
 
 ## Ограничения и честные оговорки
 

@@ -33,6 +33,118 @@ def read_clients() -> list[dict]:
     return items
 
 
+def heartbeat_config_path() -> Path:
+    path = config.data_dir() / "admin" / "heartbeat.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def read_heartbeat_config() -> dict:
+    data = config.load_json(heartbeat_config_path(), {})
+    return {
+        "url": str(data.get("url") or "").strip(),
+        "token": str(data.get("token") or "").strip(),
+    }
+
+
+def save_heartbeat_config(url: str, token: str) -> dict:
+    payload = {"url": (url or "").strip(), "token": (token or "").strip()}
+    config.save_json(heartbeat_config_path(), payload)
+    return payload
+
+
+def read_remote_clients(timeout: int = 12) -> list[dict]:
+    """Клиенты с внешнего приёмника heartbeat; пустой список, если он недоступен."""
+    from .util import http_json
+
+    settings = read_heartbeat_config()
+    if not settings["url"]:
+        return []
+    base = settings["url"].rstrip("/")
+    # В настройках часто указан .../heartbeat — для чтения клиентов нужен путь /clients
+    if base.endswith("/heartbeat"):
+        base = base[: -len("/heartbeat")]
+    url = base if base.endswith("/clients") else base + "/clients"
+    if settings["token"]:
+        url += ("&" if "?" in url else "?") + "token=" + urllib.parse.quote(settings["token"])
+    try:
+        payload = http_json(url, timeout=timeout)
+    except Exception:
+        return []
+    clients = payload.get("clients") if isinstance(payload, dict) else None
+    if not isinstance(clients, list):
+        return []
+    return [item for item in clients if isinstance(item, dict)]
+
+
+def clients_for_admin() -> list[dict]:
+    """Объединяет записи приёмника и локального файла, оставляя самую свежую по клиенту."""
+    merged: dict[str, dict] = {}
+    for source in (read_clients(), read_remote_clients()):
+        for item in source:
+            key = str(item.get("instance_id") or "")
+            if not key:
+                continue
+            current = merged.get(key)
+            if current is None or int(item.get("last_seen") or 0) >= int(current.get("last_seen") or 0):
+                merged[key] = item
+    items = list(merged.values())
+    items.sort(key=lambda item: item.get("last_seen", 0), reverse=True)
+    return items
+
+
+def delete_local_clients(instance_ids: list[str]) -> int:
+    """Убирает клиентов из локального файла админки."""
+    keys = {str(key) for key in instance_ids if key}
+    if not keys:
+        return 0
+    with LOCK:
+        data = config.load_json(clients_path(), {"clients": {}})
+        clients = data.get("clients") or {}
+        removed = [key for key in keys if key in clients]
+        for key in removed:
+            clients.pop(key, None)
+        if removed:
+            config.save_json(clients_path(), data)
+    return len(removed)
+
+
+def delete_remote_clients(instance_ids: list[str], timeout: int = 12) -> tuple[int, str]:
+    """Убирает клиентов из внешнего приёмника heartbeat.
+
+    Возвращает (сколько удалено, текст ошибки). Удалением занимается сам
+    приёмник: он знает, что лежит в текущем хранилище.
+    """
+    from .util import http_json
+
+    keys = [str(key) for key in instance_ids if key]
+    if not keys:
+        return 0, ""
+    settings = read_heartbeat_config()
+    if not settings["url"]:
+        return 0, ""
+    base = settings["url"].rstrip("/")
+    if base.endswith("/heartbeat"):
+        base = base[: -len("/heartbeat")]
+    url = base if base.endswith("/clients") else base + "/clients"
+    header = {"X-Token": settings["token"]} if settings["token"] else {}
+    try:
+        payload = http_json(url, payload={"instance_ids": keys}, method="DELETE", timeout=timeout, headers=header)
+    except Exception as exc:
+        return 0, str(exc)
+    try:
+        return int((payload or {}).get("deleted") or 0), ""
+    except (TypeError, ValueError):
+        return 0, ""
+
+
+def delete_clients(instance_ids: list[str]) -> tuple[int, str]:
+    """Удаляет клиентов локально и во внешнем приёмнике; возвращает (удалено, ошибка)."""
+    removed = delete_local_clients(instance_ids)
+    remote, error = delete_remote_clients(instance_ids)
+    return max(removed, remote), error
+
+
 def save_heartbeat(payload: dict) -> None:
     if not isinstance(payload, dict):
         return
@@ -46,6 +158,10 @@ def save_heartbeat(payload: dict) -> None:
             "username": str(payload.get("username") or previous.get("username") or "")[:32],
             "version": str(payload.get("version") or "")[:32],
             "loader": str(payload.get("loader") or "")[:32],
+            "icon": str(payload.get("icon") or previous.get("icon") or "")[:512],
+            "started": int(payload.get("started") or previous.get("started") or 0),
+            "game_started": int(payload.get("game_started") or 0),
+            "in_game": bool(payload.get("in_game")),
             "last_seen": int(time.time()),
             "first_seen": previous.get("first_seen") or int(time.time()),
         }
