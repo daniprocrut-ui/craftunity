@@ -113,6 +113,38 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function confirmDependencyRemoval(projectId, name) {
+  let payload = {};
+  try {
+    const response = await fetch("/api/mods/remove", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+    });
+    payload = await response.json();
+  } catch (err) {
+    toast(err.message, true);
+    return;
+  }
+  if (!payload || !payload.needs_confirm) {
+    toast((payload && payload.error) || "Не удалось удалить", true);
+    return;
+  }
+  const list = (payload.dependents || []).map((item) => "• " + (item.title || item.project_id)).join("\n");
+  const answer = confirm(
+    `«${name}» нужно другим модам:\n\n${list}\n\n` +
+    "Если удалить, эти моды перестанут работать.\nУдалить всё равно?"
+  );
+  if (!answer) return;
+  try {
+    await api("/api/mods/remove", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId, force: true }),
+    });
+    toast("Удалено, зависимые моды могут не работать");
+    loadInstalled();
+  } catch (err) { toast(err.message, true); }
+}
+
 function toast(message, bad = false) {
   const el = $("#toast");
   el.textContent = message;
@@ -620,14 +652,24 @@ function renderInstalled() {
       ? `data-toggle-file="1" data-kind="${mod.kind || "mod"}" data-filename="${escapeHtml(mod.filename || "")}" data-enabled="${disabled ? "0" : "1"}"`
       : `data-toggle="${escapeHtml(mod.project_id || "")}" data-enabled="${disabled ? "0" : "1"}"`;
     const toggleHtml = `<button class="btn small${disabled ? "" : " ghost"}" ${toggleAttrs}>${disabled ? "Включить" : "Выключить"}</button>`;
-    const actions = disabled
-      ? toggleHtml
-      : toggleHtml +
-        (locked
-          ? `<span class="chip" title="Мод приходит из модпака и обновляется сервером">из модпака</span>`
-          : `<button class="btn small danger" ${removeAttrs}>Удалить</button>`);
-    const removeHtml = `<div class="installed-actions">${actions}</div>`;
+    const actions = locked
+      ? `<span class="chip" title="Мод приходит из модпака и обновляется сервером">из модпака</span>`
+      : disabled
+        ? toggleHtml
+        : toggleHtml + `<button class="btn small danger" ${removeAttrs}>Удалить</button>`;
     const stateChip = disabled ? `<span class="chip off">выключен</span>` : "";
+    const missing = Array.isArray(mod.missing_dependencies) ? mod.missing_dependencies : [];
+    const warnHtml = missing.length
+      ? `<span class="dep-warn" tabindex="0">!<span class="dep-tip">` +
+        `<b>Мод может не работать</b><br>Не хватает: ${escapeHtml(missing.join(", "))}` +
+        `</span></span>`
+      : "";
+    const warnClass = missing.length ? " has-warning" : "";
+    const canInstallDeps = missing.length && !String(mod.project_id || "").startsWith("file:");
+    const depHtml = canInstallDeps
+      ? `<button class="btn small primary" data-install-deps="${escapeHtml(mod.project_id || "")}">Установить зависимости</button>`
+      : "";
+    const removeHtml = `<div class="installed-actions">${actions}${depHtml}</div>`;
     const title = escapeHtml(mod.title || mod.slug || "файл");
     const remoteIcon = mod.icon_hd || mod.icon || "";
     const iconSrc = tracked ? `/api/icon/${encodeURIComponent(mod.project_id)}` : remoteIcon;
@@ -636,10 +678,10 @@ function renderInstalled() {
       : `<div class="installed-icon placeholder">${escapeHtml((mod.title || mod.slug || "?").trim().charAt(0).toUpperCase())}</div>`;
     if (state.contentView === "list") {
       return `
-        <div class="list-item installed-item${disabled ? " is-off" : ""}"${openAttr}>
+        <div class="list-item installed-item${disabled ? " is-off" : ""}${warnClass}"${openAttr}>
           ${icon}
           <div class="grow">
-            <div class="name">${title} <span class="chip" style="margin-left:6px">${label.one}</span> ${stateChip}</div>
+            <div class="name">${title} <span class="chip" style="margin-left:6px">${label.one}</span> ${stateChip} ${warnHtml}</div>
             <div class="meta">${escapeHtml(mod.version || "")} ${mod.filename ? "· " + escapeHtml(mod.filename) : ""}</div>
             ${mod.description ? `<div class="installed-desc">${escapeHtml(mod.description)}</div>` : ""}
           </div>
@@ -647,10 +689,10 @@ function renderInstalled() {
         </div>`;
     }
     return `
-      <div class="installed-card installed-item${disabled ? " is-off" : ""}"${openAttr}>
+      <div class="installed-card installed-item${disabled ? " is-off" : ""}${warnClass}"${openAttr}>
         ${icon}
         <div class="installed-title">${title}</div>
-        <div class="installed-meta"><span class="chip">${label.one}</span> ${escapeHtml(mod.version || "")} ${stateChip}</div>
+        <div class="installed-meta"><span class="chip">${label.one}</span> ${escapeHtml(mod.version || "")} ${stateChip} ${warnHtml}</div>
         ${mod.description ? `<div class="installed-desc">${escapeHtml(mod.description)}</div>` : ""}
         ${removeHtml}
       </div>`;
@@ -1116,6 +1158,34 @@ function bindEvents() {
     if (card) openProject(card.dataset.open);
   });
   $("#installedMods").addEventListener("click", async (e) => {
+    if (e.target.dataset.installDeps) {
+      const projectId = e.target.dataset.installDeps;
+      const button = e.target;
+      button.disabled = true;
+      const previous = button.textContent;
+      button.textContent = "Ставлю…";
+      try {
+        const data = await api("/api/mods/install-dependencies", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project_id: projectId }),
+        });
+        const count = data.count || 0;
+        const errors = data.errors || [];
+        if (count) {
+          toast(`Доставлено зависимостей: ${count}`);
+        } else if (errors.length) {
+          toast(`Не удалось поставить: ${errors[0].error || "ошибка"}`, true);
+        } else {
+          toast("Недостающих зависимостей не найдено", true);
+        }
+        await loadInstalled();
+      } catch (err) {
+        toast(err.message, true);
+        button.disabled = false;
+        button.textContent = previous;
+      }
+      return;
+    }
     if (e.target.dataset.toggleFile) {
       const enabled = e.target.dataset.enabled !== "1";
       try {
@@ -1159,15 +1229,20 @@ function bindEvents() {
       return;
     }
     if (e.target.dataset.remove) {
-      if (!confirm("Удалить контент?")) return;
+      const projectId = e.target.dataset.remove;
+      const mod = (state.installed || []).find((item) => item.project_id === projectId);
+      const name = (mod && (mod.title || mod.slug)) || projectId;
+      if (!confirm(`Удалить «${name}»?`)) return;
       try {
         await api("/api/mods/remove", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ project_id: e.target.dataset.remove }),
+          body: JSON.stringify({ project_id: projectId }),
         });
         toast("Удалено");
         loadInstalled();
-      } catch (err) { toast(err.message, true); }
+      } catch (err) {
+        await confirmDependencyRemoval(projectId, name);
+      }
       return;
     }
     const card = e.target.closest("[data-open]");

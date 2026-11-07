@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -182,31 +183,6 @@ def startup_update_check(timeout: float = 8.0) -> None:
     finished.wait(timeout)
 
 
-def webview2_available() -> bool:
-    """Есть ли рантайм Edge WebView2: без него окно webview остаётся пустым."""
-    if os.name != "nt":
-        return True
-    try:
-        import winreg
-
-        keys = (
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
-            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
-        )
-        for root, path in keys:
-            try:
-                with winreg.OpenKey(root, path) as key:
-                    version = str(winreg.QueryValueEx(key, "pv")[0] or "").strip()
-                if version and version != "0.0.0.0":
-                    return True
-            except OSError:
-                continue
-    except Exception:
-        return True
-    return False
-
-
 def temp_problem() -> str:
     """Проверяет, сможет ли распаковка сборки работать во временной папке."""
     folder = os.environ.get("TEMP") or os.environ.get("TMP") or ""
@@ -244,26 +220,104 @@ def show_problem(title: str, text: str) -> None:
         print(text, file=sys.stderr)
 
 
-def run_window(url: str) -> bool:
-    if not webview2_available():
-        return False
+def _window_flags() -> tuple[int, object]:
+    if os.name != "nt":
+        return 0, None
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    startup = subprocess.STARTUPINFO()
+    startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = 0
+    return flags, startup
+
+
+def _detached(command: list[str]) -> bool:
+    flags, startup = _window_flags()
     try:
-        import webview  # type: ignore
-    except Exception:
-        return False
-    try:
-        window = webview.create_window(
-            "Craftunity Launcher",
-            url,
-            width=1180,
-            height=760,
-            min_size=(980, 640),
-            background_color="#0b0d12",
+        subprocess.Popen(
+            command,
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=flags,
+            startupinfo=startup,
         )
-        webview.start()
         return True
+    except (OSError, ValueError):
+        return False
+
+
+def open_native_window(url: str) -> bool:
+    """Окно на tkinter + WebView2, если WebView2 на машине доступен и не заблокирован."""
+    if os.name != "nt":
+        return False
+    try:
+        from craftunity import native_window
     except Exception:
         return False
+    if not native_window.available():
+        return False
+    if not getattr(sys, "frozen", False):
+        return bool(native_window.run(url))
+    return _detached([sys.executable, "--native-window", url])
+
+
+def open_native_window_blocking(url: str) -> bool:
+    """Запускает окно WebView2 в текущем процессе (для режима --native-window)."""
+    try:
+        from craftunity import native_window
+    except Exception:
+        return False
+    return native_window.run(url)
+
+
+def run_window(url: str) -> bool:
+    """Интерфейс открывается в отдельном окне: WebView2, браузер-app или вкладка браузера."""
+    if open_native_window(url):
+        return True
+    if launchable_browser(url):
+        return True
+    try:
+        return bool(webbrowser.open(url))
+    except Exception:
+        return False
+
+
+def browser_ok(url: str) -> bool:
+    return bool(url)
+
+
+def launchable_browser(url: str) -> bool:
+    """Открывает интерфейс окном браузера без вкладок и адресной строки."""
+    if os.name != "nt":
+        return False
+    candidates: list[tuple[str, list[str]]] = []
+    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
+        if not base:
+            continue
+        candidates += [
+            (os.path.join(base, r"Google\Chrome\Application\chrome.exe"), ["--app=" + url]),
+            (os.path.join(base, r"Microsoft\Edge\Application\msedge.exe"), ["--app=" + url]),
+            (os.path.join(base, r"BraveSoftware\Brave-Browser\Application\brave.exe"), ["--app=" + url]),
+            (os.path.join(base, r"Vivaldi\Application\vivaldi.exe"), ["--app=" + url]),
+            (os.path.join(base, r"Yandex\YandexBrowser\Application\browser.exe"), ["--app=" + url]),
+        ]
+    local = os.environ.get("LOCALAPPDATA") or ""
+    if local:
+        candidates += [
+            (os.path.join(local, r"Google\Chrome\Application\chrome.exe"), ["--app=" + url]),
+            (os.path.join(local, r"Microsoft\Edge\Application\msedge.exe"), ["--app=" + url]),
+            (os.path.join(local, r"BraveSoftware\Brave-Browser\Application\brave.exe"), ["--app=" + url]),
+            (os.path.join(local, r"Yandex\YandexBrowser\Application\browser.exe"), ["--app=" + url]),
+            (os.path.join(local, r"Programs\Opera GX\opera.exe"), ["--app=" + url]),
+            (os.path.join(local, r"Programs\Opera\opera.exe"), ["--app=" + url]),
+        ]
+    for path, args in candidates:
+        if not os.path.exists(path):
+            continue
+        if _detached([path, *args]):
+            return True
+    return False
 
 
 def main() -> int:
@@ -274,9 +328,14 @@ def main() -> int:
     parser.add_argument("--browser", action="store_true", help="Открыть в браузере вместо окна")
     parser.add_argument("--prepare-keys", action="store_true", help="Создать ключи подписи и выйти")
     parser.add_argument("--updated", action="store_true", help="Служебный флаг: лаунчер перезапущен после обновления")
+    parser.add_argument("--native-window", default="", help="Служебный флаг: открыть окно WebView2 на указанный адрес")
+    parser.add_argument("--no-native", action="store_true", help="Не использовать окно WebView2: открыть интерфейс в браузере")
     args = parser.parse_args()
 
     config.seed_from_portable()
+
+    if args.native_window:
+        return 0 if open_native_window_blocking(args.native_window) else 1
 
     if not args.prepare_keys and getattr(sys, "frozen", False):
         trouble = temp_problem()
@@ -321,6 +380,10 @@ def main() -> int:
     if updater.apply_pending(["--updated"]):
         return 0
     updater.cleanup_old()
+    try:
+        updater.cleanup_temp()
+    except Exception:
+        pass
 
     if os.environ.get("CRAFTUNITY_SINGLE") == "1":
         existing = existing_instance()
@@ -374,6 +437,10 @@ def main() -> int:
             print(url)
             while True:
                 time.sleep(1)
+        if not args.browser and not args.no_native and getattr(sys, "frozen", False):
+            if open_native_window(url):
+                while True:
+                    time.sleep(1)
         if not args.browser and run_window(url):
             return 0
         webbrowser.open(url)

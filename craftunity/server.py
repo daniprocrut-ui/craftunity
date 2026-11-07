@@ -37,6 +37,29 @@ def _write_clients(data: dict) -> None:
     config.save_json(_clients_path(), data)
 
 
+PLAY_SESSION_GAP = 180
+
+
+def _track_playtime(previous: dict, now: int, in_game: bool, game_started: int) -> dict:
+    """Копит время игры: играющим считается клиент, отправляющий heartbeat чаще PLAY_SESSION_GAP."""
+    total = int(previous.get("play_seconds") or 0)
+    session = int(previous.get("session_start") or 0)
+    last_seen = int(previous.get("last_seen") or 0)
+    was_playing = bool(previous.get("playing"))
+    delta = 0
+    if was_playing and last_seen:
+        delta = min(max(0, now - last_seen), PLAY_SESSION_GAP)
+    closing = not in_game or now - last_seen > PLAY_SESSION_GAP
+    if closing:
+        total += delta
+        session = 0
+    else:
+        if not was_playing or not session:
+            session = game_started or now
+        total += delta
+    return {"play_seconds": total, "session_start": session, "playing": bool(in_game)}
+
+
 def _overview() -> dict:
     settings = config.load_settings()
     account = state.current_account()
@@ -283,9 +306,38 @@ class Handler(BaseHTTPRequestHandler):
                 data = self._read_json()
                 removed = files.delete_file(data.get("dest") or "game", data.get("name") or "")
                 return self._send({"ok": True, **removed})
+            if path == "/api/mods/install-dependencies":
+                data = self._read_json()
+                project_id = data.get("project_id") or ""
+                settings = config.load_settings()
+                manifest_game = ((ENGINE.manifest or {}).get("game") or {})
+                version = manifest_game.get("version") or settings["game_version"]
+                result = mods.install_dependencies(project_id, version, "fabric")
+                ok = [item for item in result if not item.get("error")]
+                return self._send(
+                    {
+                        "ok": True,
+                        "installed": ok,
+                        "count": len(ok),
+                        "errors": [item for item in result if item.get("error")],
+                    }
+                )
             if path == "/api/mods/remove":
                 data = self._read_json()
-                removed = mods.remove_project(data.get("project_id") or "")
+                project_id = data.get("project_id") or ""
+                if not data.get("force"):
+                    users = mods.dependents_for(project_id=project_id)
+                    if users:
+                        return self._send(
+                            {
+                                "ok": False,
+                                "needs_confirm": True,
+                                "dependents": users,
+                                "error": "Этот мод нужен другим установленным модам.",
+                            },
+                            status=409,
+                        )
+                removed = mods.remove_project(project_id)
                 return self._send({"ok": True, "mod": removed})
             if path == "/api/skin/upload":
                 body = self._read_body(2 * 1024 * 1024)
@@ -327,9 +379,17 @@ class Handler(BaseHTTPRequestHandler):
                 data = self._read_json()
                 clients = _read_clients()
                 key = data.get("instance_id") or "unknown"
+                previous = (clients.get("clients") or {}).get(key) or {}
+                now = int(time.time())
+                in_game = bool(data.get("in_game"))
+                game_started = int(data.get("game_started") or 0)
                 clients.setdefault("clients", {})[key] = {
                     **data,
-                    "last_seen": int(time.time()),
+                    "username": str(data.get("username") or previous.get("username") or "")[:32],
+                    "icon": str(data.get("icon") or previous.get("icon") or "")[:512],
+                    "first_seen": int(previous.get("first_seen") or now),
+                    "last_seen": now,
+                    **_track_playtime(previous, now, in_game, game_started),
                 }
                 _write_clients(clients)
                 return self._send({"ok": True})

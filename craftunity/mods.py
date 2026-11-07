@@ -385,6 +385,7 @@ def install_project(
         ),
     }
     deps = []
+    dep_projects = []
     if with_dependencies and kind == "mod":
         for dep in version.get("dependencies", []):
             if dep.get("dependency_type") != "required" or not dep.get("project_id"):
@@ -392,9 +393,17 @@ def install_project(
             try:
                 result = install_project(dep["project_id"], game_version, loader, with_dependencies=True)
                 deps.append(result.get("filename"))
+                dep_projects.append(
+                    {
+                        "project_id": dep["project_id"],
+                        "title": result.get("title") or dep["project_id"],
+                        "filename": result.get("filename"),
+                    }
+                )
             except LauncherError:
                 continue
     item["dependencies"] = deps
+    item["dependency_projects"] = dep_projects
     cache_icon(project_id, item.get("icon") or "", item.get("icon_hd") or "")
     _upsert(item)
     if kind == "shader":
@@ -729,6 +738,122 @@ def project_info(project_id: str) -> dict:
     }
 
 
+def dependents(filename: str) -> list[dict]:
+    """Кто из установленных модов требует этот файл как зависимость."""
+    wanted = Path(str(filename or "")).name
+    if not wanted:
+        return []
+    result = []
+    for item in installed():
+        if item.get("disabled"):
+            continue
+        deps = item.get("dependencies") or []
+        if any(Path(str(dep)).name == wanted for dep in deps):
+            result.append(
+                {
+                    "project_id": item.get("project_id"),
+                    "title": item.get("title") or item.get("slug") or wanted,
+                }
+            )
+    return result
+
+
+def dependents_for(project_id: str = "", kind: str = "", filename: str = "") -> list[dict]:
+    """Зависимые моды для записи по project_id или по файлу."""
+    target = Path(str(filename or "")).name
+    if not target and project_id:
+        for item in installed():
+            if item.get("project_id") == project_id:
+                target = Path(item.get("path") or "").name
+                break
+    if not target:
+        return []
+    items = dependents(target)
+    return [entry for entry in items if entry.get("project_id") != project_id]
+
+
+def _project_by_filename(filename: str, game_version: str, loader: str) -> dict | None:
+    """Ищет проект в Modrinth, у которого есть именно этот файл."""
+    stem = Path(str(filename or "")).stem
+    if not stem:
+        return None
+    query = stem.split("+")[0].split("-")[0].replace("_", " ").strip()
+    if not query:
+        return None
+    try:
+        found = search(query, game_version, loader, limit=12, kind="mod")
+    except LauncherError:
+        return None
+    wanted = Path(str(filename)).name
+    for hit in found.get("hits") or []:
+        project_id = str(hit.get("id") or hit.get("slug") or "")
+        if not project_id:
+            continue
+        try:
+            versions = project_versions(project_id, game_version, loader)
+        except LauncherError:
+            continue
+        for version in versions:
+            for item in version.get("files") or []:
+                if Path(str(item.get("filename") or "")).name == wanted:
+                    return {
+                        "project_id": project_id,
+                        "title": hit.get("title") or project_id,
+                        "filename": wanted,
+                    }
+    return None
+
+
+def missing_projects(project_id: str, game_version: str = "", loader: str = "") -> list[dict]:
+    """Зависимости конкретного мода, которых нет среди установленных.
+
+    Возвращает записи вида {"project_id", "title"}: по ним можно поставить
+    недостающее одним нажатием.
+    """
+    entry = next((item for item in installed() if item.get("project_id") == project_id), None)
+    if not entry:
+        return []
+    present = {Path(item.get("path") or "").name for item in installed_all()["items"]}
+    known = {
+        Path(str(dep.get("filename") or "")).name: dep
+        for dep in entry.get("dependency_projects") or []
+        if dep.get("filename")
+    }
+    result = []
+    for dep_file in entry.get("dependencies") or []:
+        filename = Path(str(dep_file)).name
+        if not filename or filename in present:
+            continue
+        dep = known.get(filename) or {}
+        dep_id = dep.get("project_id")
+        title = dep.get("title") or ""
+        if not dep_id and game_version:
+            found = _project_by_filename(filename, game_version, loader)
+            if found:
+                dep_id = found["project_id"]
+                title = found.get("title") or title
+                entry.setdefault("dependency_projects", []).append(found)
+        if not dep_id:
+            continue
+        if any(item.get("project_id") == dep_id for item in result):
+            continue
+        result.append({"project_id": dep_id, "title": title or dep_id})
+    if result:
+        _upsert(entry)
+    return result
+
+
+def install_dependencies(project_id: str, game_version: str, loader: str) -> list[dict]:
+    """Доставляет недостающие зависимости одного мода."""
+    installed_items = []
+    for dep in missing_projects(project_id):
+        try:
+            installed_items.append(install_project(dep["project_id"], game_version, loader, with_dependencies=True))
+        except LauncherError as exc:
+            installed_items.append({"project_id": dep["project_id"], "error": str(exc)})
+    return installed_items
+
+
 def installed_all() -> dict:
     """Установленный контент: отслеживаемые записи + файлы, положенные вручную."""
     tracked = installed()
@@ -761,6 +886,31 @@ def installed_all() -> dict:
         if description and not item.get("description"):
             item["description"] = description
             changed = True
+    by_file = {
+        Path(entry.get("path") or "").name: entry
+        for entry in tracked
+        if entry.get("path") and not str(entry.get("project_id") or "").startswith("file:")
+    }
+    for entry in tracked:
+        deps = entry.get("dependencies") or []
+        if not deps or entry.get("dependency_projects"):
+            continue
+        restored = []
+        for dep_file in deps:
+            name = Path(str(dep_file)).name
+            owner = by_file.get(name)
+            if not owner:
+                continue
+            restored.append(
+                {
+                    "project_id": owner.get("project_id"),
+                    "title": owner.get("title") or owner.get("slug") or name,
+                    "filename": name,
+                }
+            )
+        if restored:
+            entry["dependency_projects"] = restored
+            changed = True
     if changed:
         _save(tracked)
     known = {str(Path(item.get("path", "")).resolve()) for item in tracked if item.get("path")}
@@ -788,6 +938,12 @@ def installed_all() -> dict:
                 }
             )
     items.sort(key=lambda item: item.get("installed_at", 0), reverse=True)
+    present = {Path(item.get("path") or "").name for item in items}
+    for entry in items:
+        deps = entry.get("dependencies") or []
+        missing = [str(dep) for dep in deps if Path(str(dep)).name not in present]
+        if missing:
+            entry["missing_dependencies"] = missing
     warm_icons()
     return {"items": items}
 

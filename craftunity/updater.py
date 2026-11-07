@@ -236,6 +236,46 @@ def orphan_copies() -> list[Path]:
     return found
 
 
+def cleanup_temp(keep_seconds: int = 3600) -> int:
+    """Убирает папки распаковки _MEI во временном каталоге, оставшиеся от прошлых запусков.
+
+    Onefile-сборка распаковывается в %TEMP%\\_MEIxxxxx и убирает папку после выхода.
+    Если процесс упал или его убили, папка остаётся; со временем их становится столько,
+    что распаковка нового запуска падает с ошибкой pyi_rth_multiprocessing.
+    """
+    import tempfile
+
+    if os.name != "nt":
+        return 0
+    current = getattr(sys, "_MEIPASS", "") or ""
+    root = Path(tempfile.gettempdir())
+    removed = 0
+    try:
+        candidates = list(root.glob("_MEI*"))
+    except OSError:
+        return 0
+    now = time.time()
+    for folder in candidates:
+        try:
+            if not folder.is_dir():
+                continue
+            if current and Path(current).resolve() == folder.resolve():
+                continue
+            age = now - folder.stat().st_mtime
+            if keep_seconds and age < keep_seconds:
+                continue
+        except OSError:
+            continue
+        try:
+            shutil.rmtree(folder, ignore_errors=False)
+            removed += 1
+        except OSError:
+            continue
+    if removed:
+        _log_update(f"удалено старых папок распаковки: {removed}")
+    return removed
+
+
 def cleanup_old(attempts: int = 4, delay: float = 1.5) -> int:
     """Удаляет старые копии exe; повторяет попытки, пока файл занят системой."""
     if not is_frozen():

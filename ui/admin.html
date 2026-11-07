@@ -60,13 +60,15 @@
   </div>
 
   <div class="card" style="margin-top:18px">
-    <h3>Подключённые клиенты</h3>
-    <div class="hint">Лаунчеры отправляют heartbeat при запуске игры.</div>
-    <div style="overflow-x:auto;margin-top:12px">
-      <table>
-        <thead><tr><th>Клиент</th><th>Игрок</th><th>Версия</th><th>Последняя активность</th></tr></thead>
-        <tbody id="clientsBody"><tr><td colspan="4" class="empty">Пока нет данных</td></tr></tbody>
-      </table>
+    <div class="players-head">
+      <div>
+        <h3>Игроки</h3>
+        <div class="hint">Лаунчеры присылают heartbeat при запуске игры. Время игры копится по таким сообщениям.</div>
+      </div>
+      <div class="players-stats" id="playersStats"></div>
+    </div>
+    <div class="players-grid" id="playersGrid">
+      <div class="empty" style="grid-column:1/-1">Пока нет данных</div>
     </div>
   </div>
 
