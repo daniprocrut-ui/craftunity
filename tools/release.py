@@ -180,6 +180,11 @@ def upload(repo: str, version: str, notes: str, allow_empty_notes: bool) -> str:
     return url
 
 
+def release_asset_url(repo: str, version: str) -> str:
+    """Постоянный адрес сборки в GitHub Releases — основной источник обновления."""
+    return f"https://github.com/{repo}/releases/download/v{version}/{ASSET_NAME}"
+
+
 def publish_manifest(version: str, url: str, digest: str, notes: str, mandatory: bool, mirror: str = "") -> Path:
     data = manifest.manifest_for_admin()
     block = dict(data.get("launcher") or {})
@@ -249,11 +254,11 @@ def main() -> int:
         raise SystemExit(f"Версия {version} не новее текущей {old}")
 
     repo = repo_slug(args.repo)
-    tag_url = f"https://github.com/{repo}/releases/download/v{version}/{ASSET_NAME}"
+    tag_url = release_asset_url(repo, version)
     folder_url = pages_launcher_url(repo, version)
     print(f"Выпуск {old} → {version}")
-    print(f"Папка сервера: {folder_url}")
-    print(f"Зеркало:       {tag_url}")
+    print(f"Основной адрес: {tag_url}")
+    print(f"Резерв (Pages): {folder_url}")
     print(f"Обязательное: {'да' if args.mandatory else 'нет'}")
     if args.dry_run:
         print("Dry run: ничего не меняю.")
@@ -272,9 +277,11 @@ def main() -> int:
     stage_launcher(version)
     mirror = ""
     if not args.no_upload:
-        mirror = upload(repo, version, args.notes, allow_empty_notes=True)
+        upload(repo, version, args.notes, allow_empty_notes=True)
+    else:
+        mirror = folder_url
 
-    publish_manifest(version, folder_url, digest, args.notes, args.mandatory, mirror)
+    publish_manifest(version, tag_url, digest, args.notes, args.mandatory, mirror)
     if not args.no_commit:
         commit_and_push(version, args.push)
     print("\nГотово. Текущие клиенты получат обновление при следующем запуске.")
