@@ -227,17 +227,6 @@ class AdminApp:
         style.configure("Treeview.Heading", background=CARD, foreground=MUTED, relief="flat", font=("Segoe UI", 9))
         style.map("Treeview", background=[("selected", SEL_BG)])
         style.configure("TScrollbar", background=BG_ALT, troughcolor=BG, borderwidth=0, arrowcolor=MUTED)
-        style.configure("TScrollbar", background=BG_ALT, troughcolor=BG, borderwidth=0, arrowcolor=MUTED)
-        style.configure("Radiobutton", background=BG, foreground=FG, font=("Segoe UI", 10), focuscolor=BG)
-        style.map("Radiobutton", background=[("active", BG)], foreground=[("active", FG)])
-        style.configure("TCheckbutton", background=BG, foreground=FG, font=("Segoe UI", 10), focuscolor=BG)
-        style.map("TCheckbutton", background=[("active", BG)], foreground=[("active", FG)])
-        style.configure("TSeparator", background=BORDER)
-        style.configure("Pane.TFrame", background=BG_ALT)
-        style.configure("Tile.TFrame", background=BG_ALT)
-        style.configure("TileTitle.TLabel", background=BG_ALT, foreground=FG, font=("Segoe UI", 10))
-        style.configure("TileSub.TLabel", background=BG_ALT, foreground=MUTED, font=("Segoe UI", 8))
-        style.configure("Chip.TLabel", background=CARD, foreground=ACCENT, font=("Segoe UI", 9), padding=(10, 4))
 
     # ----------------------------------------------------------------- layout
 
@@ -952,124 +941,8 @@ class AdminApp:
         "shader": "Шейдеры",
     }
 
-    CONTENT_KIND_ICONS = {"mod": "⛭", "resourcepack": "▣", "shader": "◈"}
-
-    @staticmethod
-    def _duration_text(seconds: int) -> str:
-        seconds = max(0, int(seconds))
-        hours, rest = divmod(seconds, 3600)
-        minutes = rest // 60
-        if hours:
-            return f"{hours} ч {minutes:02d} мин"
-        if minutes:
-            return f"{minutes} мин"
-        return f"{seconds} сек"
-
-    @staticmethod
-    def _stamp_text(value: int) -> str:
-        return time.strftime("%d.%m.%Y %H:%M", time.localtime(value)) if value else "—"
-
-    def _client_details(self, short_id: str) -> dict | None:
-        for item in clients_for_admin():
-            instance = str(item.get("instance_id") or "")
-            if instance.startswith(short_id) or instance == short_id:
-                return item
-        return None
-
-    def _text_image(self, text: str, size: int, color: str, bold: bool = False):
-        """PNG-картинка с текстом: Tk не умеет измерить ширину подписи заранее."""
-        try:
-            from PIL import Image, ImageDraw, ImageFont, ImageTk
-        except ImportError:
-            return None, 0
-        font = None
-        for name in (("seguisb.ttf", "segoeuib.ttf") if bold else ("segoeui.ttf",)):
-            try:
-                font = ImageFont.truetype(name, size)
-                break
-            except Exception:
-                font = None
-        if font is None:
-            font = ImageFont.load_default()
-        try:
-            left, top, right, bottom = font.getbbox(text)
-        except Exception:
-            left, top, right, bottom = 0, 0, len(text) * int(size * 0.6), size
-        width = max(1, right - left + 4)
-        height = max(1, bottom - top + 4)
-        image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        ImageDraw.Draw(image).text((2 - left, 2 - top), text, font=font, fill=color)
-        return ImageTk.PhotoImage(image), width
-
-    @staticmethod
-    def _rgb(value: str) -> tuple[int, int, int]:
-        value = str(value or "").lstrip("#")
-        if len(value) != 6:
-            return (38, 43, 50)
-        return tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
-
-
-    def _placeholder_icon(self, kind: str, disabled: bool):
-        """Значок вместо иконки: документ с загнутым уголком и буквой типа."""
-        try:
-            from PIL import Image, ImageDraw, ImageFont, ImageTk
-        except ImportError:
-            return None
-        side = 40
-        body = self._rgb(CARD_HOVER if disabled else CARD)
-        edge = self._rgb(MUTED)
-        mark = self._rgb(MUTED if disabled else ACCENT)
-        image = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        fold = 11
-        draw.polygon([(3, 5), (side - fold, 5), (side - 4, 5 + fold), (side - 4, side - 4), (3, side - 4)],
-                     fill=body)
-        draw.line([(3, 5), (side - fold, 5), (side - 4, 5 + fold), (side - 4, side - 4), (3, side - 4), (3, 5)],
-                  fill=edge, width=1, joint="curve")
-        draw.polygon([(side - fold, 5), (side - 4, 5 + fold), (side - fold, 5 + fold)], fill=edge)
-        glyph = {"mod": "M", "resourcepack": "R", "shader": "S"}.get(kind, "?")
-        try:
-            font = ImageFont.truetype("seguisb.ttf", 15)
-        except Exception:
-            font = ImageFont.load_default()
-        try:
-            left, top, right, bottom = font.getbbox(glyph)
-        except Exception:
-            left, top, right, bottom = 0, 0, 10, 16
-        draw.text(((side - (right - left)) / 2 - left, (side - (bottom - top)) / 2 - top + 3),
-                  glyph, font=font, fill=mark)
-        return ImageTk.PhotoImage(image)
-
-    @staticmethod
-    def _square_photo(raw: bytes, side: int = 36, disabled: bool = False):
-        """Иконка Modrinth/CurseForge, приведённая к квадрату с мягкими углами."""
-        try:
-            import io
-            from PIL import Image, ImageDraw, ImageTk
-        except ImportError:
-            return None
-        try:
-            with Image.open(io.BytesIO(raw)) as source:
-                image = source.convert("RGBA")
-                side_px = min(image.width, image.height)
-                left = (image.width - side_px) // 2
-                top = (image.height - side_px) // 2
-                image = image.crop((left, top, left + side_px, top + side_px))
-                image = image.resize((side * 3, side * 3), Image.LANCZOS)
-        except Exception:
-            return None
-        mask = Image.new("L", image.size, 0)
-        ImageDraw.Draw(mask).rounded_rectangle((0, 0, image.width - 1, image.height - 1),
-                                               radius=side * 3 // 3, fill=255)
-        alpha = image.getchannel("A")
-        alpha = Image.composite(alpha, Image.new("L", image.size, 0), mask)
-        image.putalpha(alpha)
-        if disabled:
-            image = Image.composite(Image.new("RGBA", image.size, (0, 0, 0, 150)), image, image.getchannel("A"))
-        image = image.resize((side, side), Image.LANCZOS)
-        return ImageTk.PhotoImage(image)
     def _open_client_content(self) -> None:
-        """Окно клиента: аватар, ник, время лаунчера и игры, плитки контента."""
+        """Окно со списком модов, ресурспаков и шейдеров выбранного клиента."""
         selection = self.clients_tree.selection()
         if not selection:
             messagebox.showinfo("Craftunity Admin", "Выберите клиента в таблице.")
@@ -1077,320 +950,93 @@ class AdminApp:
         values = self.clients_tree.item(selection[0], "values") or ()
         short_id = str(values[5] or "").strip() if len(values) > 5 else ""
         username = str(values[0] or "").strip() if values else ""
-        client = self._client_details(short_id)
+        client = None
+        for item in clients_for_admin():
+            instance = str(item.get("instance_id") or "")
+            if instance.startswith(short_id) or instance == short_id:
+                client = item
+                break
         if client is None:
             messagebox.showinfo("Craftunity Admin", "Запись клиента не найдена — обновите список.")
             return
 
-        username = client.get("username") or ""
         content = client.get("content")
-        entries = [entry for entry in content if isinstance(entry, dict)] if isinstance(content, list) else []
-
-        now = int(time.time())
-        fresh = self._client_is_fresh(client, now)
-        in_game = bool(client.get("in_game")) and fresh
-        launcher_started = int(client.get("started") or 0)
-        game_started = int(client.get("game_started") or 0)
-        last_seen = int(client.get("last_seen") or 0)
-        if not fresh:
-            state_text = "не в сети"
-        elif in_game:
-            state_text = "в игре"
-        else:
-            state_text = "в лаунчере"
-
-        window = tk.Toplevel(self.root)
-        window.title(f"Craftunity Admin — клиент {username or short_id}")
-        window.geometry("860x640")
-        window.minsize(700, 500)
-        window.configure(bg=BG)
-
-        header = tk.Frame(window, bg=CARD, bd=0, highlightthickness=0)
-        header.pack(fill="x", padx=16, pady=(16, 10))
-
-        avatar_label = tk.Label(header, bg=CARD, bd=0, highlightthickness=0)
-        avatar_label.pack(side="left", padx=(14, 14), pady=14)
-        photo = self.avatars.get(username) if username else None
-        if photo is not None:
-            avatar_label.configure(image=photo)
-            avatar_label.image = photo  # type: ignore[attr-defined]
-        else:
-            avatar_label.configure(text=(username or "?")[:1].upper() or "?", fg=ACCENT,
-                                   font=("Segoe UI Semibold", 28), width=2, height=1, padx=8, pady=6)
-
-        titles = tk.Frame(header, bg=CARD)
-        titles.pack(side="left", fill="x", expand=True, pady=14)
-
-        def put_text(parent, text: str, size: int, color: str, bold: bool = False, pady: int = 0):
-            image, _width = self._text_image(text, size, color, bold)
-            if image is not None:
-                label = tk.Label(parent, image=image, bg=CARD, bd=0, highlightthickness=0)
-                label.image = image  # type: ignore[attr-defined]
-            else:
-                label = tk.Label(parent, text=text, bg=CARD, fg=color,
-                                 font=("Segoe UI Semibold" if bold else "Segoe UI", max(8, size - 6)))
-            label.pack(anchor="w", pady=pady)
-            return label
-
-        put_text(titles, username or short_id, 24, FG, bold=True)
-        put_text(titles, state_text, 13, ACCENT if fresh else MUTED, pady=(4, 0))
-        put_text(
-            titles,
-            f"версия {client.get('version') or '—'} · загрузчик {client.get('loader') or '—'}",
-            13,
-            MUTED,
-            pady=(4, 0),
-        )
-
-        stats = tk.Frame(window, bg=BG)
-        stats.pack(fill="x", padx=16, pady=(0, 10))
-        cards = (
-            ("В ЛАУНЧЕРЕ", self._duration_text(now - launcher_started) if launcher_started and fresh else "—",
-             f"запуск: {self._stamp_text(launcher_started)}"),
-            ("В ИГРЕ", self._duration_text(now - game_started) if game_started and in_game else "—",
-             f"запуск: {self._stamp_text(game_started)}"),
-            ("ПОСЛЕДНЯЯ АКТИВНОСТЬ", self._stamp_text(last_seen),
-             f"{max(0, (now - last_seen) // 60)} мин назад" if last_seen else "нет данных"),
-        )
-        for index, (caption, value, note) in enumerate(cards):
-            card = tk.Frame(stats, bg=BG_ALT, bd=0, highlightthickness=1, highlightbackground=BORDER)
-            card.grid(row=0, column=index, sticky="nsew", padx=(0 if index == 0 else 8, 0))
-            stats.columnconfigure(index, weight=1)
-            ttk.Label(card, text=caption, style="CardMuted.TLabel").pack(anchor="w", padx=14, pady=(12, 2))
-            value_photo, _w = self._text_image(value, 20, FG, bold=True)
-            if value_photo is not None:
-                value_label = tk.Label(card, image=value_photo, bg=BG_ALT, bd=0, highlightthickness=0)
-                value_label.image = value_photo  # type: ignore[attr-defined]
-                value_label.pack(anchor="w", padx=14)
-            else:
-                ttk.Label(card, text=value, style="Card.TLabel").pack(anchor="w", padx=14)
-            ttk.Label(card, text=note, style="CardMuted.TLabel").pack(anchor="w", padx=14, pady=(2, 12))
-
         if not isinstance(content, list):
-            notice = tk.Frame(window, bg=BG)
-            notice.pack(fill="both", expand=True, padx=16)
-            ttk.Label(
-                notice,
-                text=f"Клиент {username or short_id} ещё не передавал состав.\n"
-                     "Лаунчер отправляет его при изменении и не чаще раза в 30 минут, начиная с версии 1.3.27.",
-                style="Muted.TLabel",
-                justify="left",
-            ).pack(anchor="w", pady=20)
-            ttk.Button(window, text="Закрыть", command=window.destroy).pack(anchor="e", padx=16, pady=16)
+            messagebox.showinfo(
+                "Craftunity Admin",
+                f"Клиент {username or short_id} ещё не передавал состав.\n\n"
+                "Лаунчер отправляет его при изменении и не чаще раза в 30 минут, "
+                "начиная с версии 1.3.27.",
+            )
             return
 
-        counts = {"mod": 0, "resourcepack": 0, "shader": 0}
-        for entry in entries:
-            kind = str(entry.get("kind") or "mod")
-            if kind in counts:
-                counts[kind] += 1
-        ttk.Label(
-            window,
-            text=f"Состав клиента: модов {counts['mod']} · ресурспаков {counts['resourcepack']} · "
-                 f"шейдеров {counts['shader']}",
-            style="Muted.TLabel",
-        ).pack(anchor="w", padx=18, pady=(0, 6))
+        window = tk.Toplevel(self.root)
+        window.title(f"Craftunity Admin — состав клиента {username or short_id}")
+        window.geometry("640x520")
+        window.minsize(520, 400)
+        window.configure(bg=BG)
 
         search_var = tk.StringVar()
-        kind_var = tk.StringVar(value="all")
         only_off_var = tk.BooleanVar(value=False)
+        kind_var = tk.StringVar(value="all")
 
-        filters = tk.Frame(window, bg=BG)
-        filters.pack(fill="x", padx=16, pady=(0, 8))
-        entry = ttk.Entry(filters, textvariable=search_var, width=30)
-        self._clipboard(entry).pack(side="left", padx=(0, 10))
+        top = ttk.Frame(window)
+        top.pack(fill="x", padx=12, pady=(12, 6))
+        self._clipboard(ttk.Entry(top, textvariable=search_var, width=28)).pack(side="left")
         for kind, title in (("all", "Все"), ("mod", "Моды"), ("resourcepack", "Ресурспаки"), ("shader", "Шейдеры")):
-            ttk.Button(
-                filters, text=title,
-                command=lambda k=kind: (kind_var.set(k), render()),
-            ).pack(side="left", padx=(0, 6))
-        ttk.Button(
-            filters, text="Только выключенные",
-            command=lambda: (only_off_var.set(not only_off_var.get()), render()),
-        ).pack(side="left", padx=(8, 0))
+            ttk.Radiobutton(
+                top, text=title, value=kind, variable=kind_var, command=lambda: render()
+            ).pack(side="left", padx=(8, 0))
+        ttk.Checkbutton(top, text="только выключенные", variable=only_off_var, command=lambda: render()).pack(
+            side="left", padx=(12, 0)
+        )
 
-        body = tk.Frame(window, bg=BG)
-        body.pack(fill="both", expand=True, padx=16)
-        canvas = tk.Canvas(body, bg=BG, highlightthickness=0, bd=0)
-        scroll = ttk.Scrollbar(body, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=scroll.set)
-        canvas.pack(side="left", fill="both", expand=True)
+        wrap = ttk.Frame(window)
+        wrap.pack(fill="both", expand=True, padx=12, pady=(0, 6))
+        tree = ttk.Treeview(wrap, columns=("title", "kind", "state"), show="headings", height=16)
+        for key, title, width in (("title", "НАЗВАНИЕ", 380), ("kind", "ТИП", 120), ("state", "СОСТОЯНИЕ", 110)):
+            tree.heading(key, text=title)
+            tree.column(key, width=width, anchor="w")
+        scroll = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scroll.set)
+        tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
-        tiles = tk.Frame(canvas, bg=BG)
-        tiles_window = canvas.create_window((0, 0), window=tiles, anchor="nw")
-        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(tiles_window, width=event.width))
 
-        def on_wheel(event) -> str:
-            canvas.yview_scroll(-2 if event.delta > 0 else 2, "units")
-            return "break"
-
-        def bind_wheel(widget) -> None:
-            widget.bind("<MouseWheel>", on_wheel)
-            for child in widget.winfo_children():
-                bind_wheel(child)
-
-        def project_guess(item: dict) -> str:
-            pid = str(item.get("project_id") or "")
-            if pid and not pid.startswith("file:"):
-                return pid
-            return ""
-
-        def slug_guess(item: dict) -> str:
-            slug = str(item.get("slug") or "")
-            if slug and not slug.startswith("file:"):
-                return slug
-            return ""
-
-        def download_bytes(url: str) -> bytes:
-            try:
-                request = urllib.request.Request(url, headers={"User-Agent": "CraftunityAdmin/1.0"})
-                with urllib.request.urlopen(request, timeout=8, context=ssl_context()) as response:
-                    return response.read(1024 * 512)
-            except Exception:
-                return b""
-
-        def download_json(url: str) -> dict | None:
-            try:
-                request = urllib.request.Request(url, headers={"User-Agent": "CraftunityAdmin/1.0"})
-                with urllib.request.urlopen(request, timeout=8, context=ssl_context()) as response:
-                    return json.loads(response.read(512 * 1024).decode("utf-8", "replace"))
-            except Exception:
-                return None
-
-        def cache_icon_bytes(key: str, raw: bytes) -> None:
-            try:
-                folder = modrinth_api.icons_dir()
-                target = folder / (modrinth_api._icon_key(key) + (".webp" if raw[:4] == b"RIFF" else ".png"))
-                target.write_bytes(raw)
-            except Exception:
-                pass
-
-        def fetch_icon(pid: str, slug: str, title: str, kind: str) -> bytes:
-            """Иконка из кеша лаунчера, затем CDN Modrinth и CurseForge."""
-            key = pid or slug
-            if key:
-                try:
-                    local = modrinth_api.icon_local(key)
-                    if local is not None:
-                        return local.read_bytes()
-                except Exception:
-                    pass
-            key = pid or slug
-            if key:
-                url = f"https://cdn.modrinth.com/data/{key}/icon.png"
-                raw = download_bytes(url)
-                if raw:
-                    cache_icon_bytes(key, raw)
-                    return raw
-            query = title or slug or pid
-            if not query:
-                return b""
-            project_type = modrinth_api.CONTENT_TYPES.get(kind, "mods")
-            facets = json.dumps([[f"project_type:{project_type}"]], separators=(",", ":"))
-            url = (f"https://api.modrinth.com/v2/search?limit=1&query="
-                   f"{urllib.parse.quote(query)}&facets={urllib.parse.quote(facets)}")
-            found = download_json(url)
-            hits = (found or {}).get("hits") or []
-            if not hits:
-                return b""
-            hit_id = str(hits[0].get("project_id") or hits[0].get("slug") or "")
-            icon_url = str(hits[0].get("icon_url") or "")
-            raw = b""
-            if icon_url:
-                raw = download_bytes(icon_url)
-            if not raw and hit_id:
-                raw = download_bytes(f"https://cdn.modrinth.com/data/{hit_id}/icon.png")
-            if raw and hit_id:
-                cache_icon_bytes(hit_id, raw)
-            return raw
-
-        def load_tile_icon(label: tk.Label, title: str, kind: str, disabled: bool, pid: str, slug: str) -> None:
-            def work() -> None:
-                raw = fetch_icon(pid, slug, title, kind)
-                photo = self._square_photo(raw, 36, disabled) if raw else None
-                if photo is None:
-                    photo = self._placeholder_icon(kind, disabled)
-
-                def apply() -> None:
-                    try:
-                        if label.winfo_exists() and photo is not None:
-                            label.configure(image=photo, text="")
-                            label.image = photo  # type: ignore[attr-defined]
-                    except tk.TclError:
-                        pass
-
-                self.ui_queue.put(apply)
-
-            threading.Thread(target=work, daemon=True).start()
+        hint = ttk.Label(window, text="", style="Muted.TLabel")
+        hint.pack(anchor="w", padx=12, pady=(0, 12))
 
         def render() -> None:
-            for child in tiles.winfo_children():
-                child.destroy()
+            for item in tree.get_children():
+                tree.delete(item)
             query = search_var.get().strip().lower()
             kind_filter = kind_var.get()
             only_off = bool(only_off_var.get())
             shown = 0
-            shown_entries = []
-            for item in entries:
-                title = str(item.get("title") or "")
-                kind = str(item.get("kind") or "mod")
-                disabled = bool(item.get("disabled"))
+            counts = {"mod": 0, "resourcepack": 0, "shader": 0}
+            for entry in content:
+                if not isinstance(entry, dict):
+                    continue
+                title = str(entry.get("title") or "")
+                kind = str(entry.get("kind") or "mod")
+                disabled = bool(entry.get("disabled"))
+                if kind in counts:
+                    counts[kind] += 1
                 if query and query not in title.lower():
                     continue
                 if kind_filter != "all" and kind != kind_filter:
                     continue
                 if only_off and not disabled:
                     continue
-                shown_entries.append((title, kind, disabled, project_guess(item), slug_guess(item)))
-            if not shown_entries:
-                ttk.Label(tiles, text="Ничего не найдено по заданным условиям.",
-                          style="Muted.TLabel").grid(row=0, column=0, sticky="w", pady=12)
-                canvas.configure(scrollregion=canvas.bbox("all"))
-                return
-            for index, (title, kind, disabled, pid, slug) in enumerate(shown_entries):
-                row, column = divmod(index, 2)
-                tile = tk.Frame(tiles, bg=CARD, bd=0, highlightthickness=0)
-                tile.grid(row=row, column=column, sticky="nsew",
-                          padx=(0 if column == 0 else 5, 5), pady=(0, 10))
-                placeholder = self._placeholder_icon(kind, disabled)
-                icon_label = tk.Label(tile, bg=CARD, bd=0, highlightthickness=0)
-                if placeholder is not None:
-                    icon_label.configure(image=placeholder)
-                    icon_label.image = placeholder  # type: ignore[attr-defined]
-                else:
-                    icon_label.configure(text=self.CONTENT_KIND_ICONS.get(kind, "?"), fg=MUTED,
-                                         font=("Segoe UI", 14))
-                icon_label.pack(side="left", padx=(12, 10), pady=10)
-                load_tile_icon(icon_label, title, kind, disabled, pid, slug)
-                texts = tk.Frame(tile, bg=CARD)
-                texts.pack(side="left", fill="x", expand=True, pady=8)
-                title_label = tk.Label(texts, text=title, bg=CARD, fg=MUTED if disabled else FG,
-                                       font=("Segoe UI", 10), anchor="w", justify="left",
-                                       wraplength=280)
-                title_label.pack(anchor="w", fill="x")
-                tk.Label(
-                    texts,
-                    text=f"{self.CONTENT_KIND_NAMES.get(kind, kind)} · {'выключен' if disabled else 'включён'}",
-                    bg=CARD,
-                    fg=MUTED,
-                    font=("Segoe UI", 8),
-                    anchor="w",
-                ).pack(anchor="w")
+                tree.insert("", "end", values=(title, self.CONTENT_KIND_NAMES.get(kind, kind),
+                                               "выключен" if disabled else "включён"))
                 shown += 1
-            for column in (0, 1):
-                tiles.columnconfigure(column, weight=1, uniform="tiles")
-            tiles.update_idletasks()
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            bind_wheel(tiles)
+            hint.configure(
+                text=f"Модов {counts['mod']} · ресурспаков {counts['resourcepack']} · шейдеров {counts['shader']}"
+                     f" — показано {shown}"
+            )
 
-        entry.bind("<KeyRelease>", lambda _event: render())
         render()
-
-        footer = tk.Frame(window, bg=BG)
-        footer.pack(fill="x", padx=16, pady=12)
-        ttk.Button(footer, text="Открыть папку клиента", command=lambda: self._open(
-            config.data_dir() / "admin")).pack(side="left")
-        ttk.Button(footer, text="Закрыть", command=window.destroy).pack(side="right")
+        ttk.Button(window, text="Закрыть", command=window.destroy).pack(anchor="e", padx=12, pady=(0, 12))
 
     def _selected_client_ids(self) -> list[str]:
         ids: list[str] = []

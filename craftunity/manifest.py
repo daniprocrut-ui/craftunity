@@ -255,7 +255,13 @@ def _version_key(value: str) -> tuple:
 
 
 def save_admin_manifest(manifest: dict) -> dict:
-    """Сохраняет и подписывает манифест; адрес сборки берётся из GitHub Releases."""
+    from . import dropbox
+
+    link = dropbox.launcher_url()
+    if link:
+        block = dict(manifest.get("launcher") or {})
+        block["url"] = link
+        manifest["launcher"] = block
     remote = _server_manifest()
     if remote:
         published = remote.get("launcher") or {}

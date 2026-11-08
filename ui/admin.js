@@ -90,124 +90,20 @@ async function load() {
 }
 
 function renderClients(clients) {
-  const grid = $("#playersGrid");
-  renderPlayersStats(clients);
+  const body = $("#clientsBody");
   if (!clients.length) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">Пока нет данных — подключённые лаунчеры появятся здесь</div>`;
+    body.innerHTML = `<tr><td colspan="4" class="empty">Пока нет данных</td></tr>`;
     return;
   }
-  grid.innerHTML = clients.map((client) => playerCard(client, clients, Date.now() / 1000)).join("");
-}
-
-function renderPlayersStats(clients) {
-  const box = $("#playersStats");
-  if (!box) return;
-  const now = Date.now() / 1000;
-  const online = clients.filter((client) => isOnline(client, now)).length;
-  const total = clients.reduce((sum, client) => sum + playSeconds(client, now), 0);
-  box.innerHTML = `
-    <span class="stat"><b>${clients.length}</b> игроков</span>
-    <span class="stat online"><b>${online}</b> в сети</span>
-    <span class="stat"><b>${formatPlaytime(total)}</b> суммарное время</span>`;
-}
-
-function isOnline(client, now) {
-  return Boolean(client.last_seen) && now - client.last_seen < 300;
-}
-
-function playSeconds(client, now = Date.now() / 1000) {
-  let total = Number(client.play_seconds) || 0;
-  if (client.session_start && now - Number(client.last_seen || 0) < 300) {
-    total += Math.max(0, now - Number(client.session_start));
-  }
-  return total;
-}
-
-function formatPlaytime(seconds) {
-  const minutes = Math.floor(seconds / 60);
-  if (seconds < 60) return seconds > 0 ? "< 1 мин" : "0 мин";
-  if (minutes < 60) return `${minutes} мин`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (hours < 100) return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
-  return `${Math.floor(hours / 24)} д ${hours % 24} ч`;
-}
-
-function playShare(client, all, now) {
-  const max = Math.max(...all.map((item) => playSeconds(item, now)), 1);
-  return Math.round((playSeconds(client, now) / max) * 100);
-}
-
-function relativeSeen(client, now) {
-  if (!client.last_seen) return "ещё не заходил";
-  const diff = Math.max(0, Math.round(now - client.last_seen));
-  if (diff < 60) return "только что";
-  if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`;
-  return new Date(client.last_seen * 1000).toLocaleDateString("ru-RU");
-}
-
-function playerCard(client, all, now) {
-  const name = client.username || "Без аккаунта";
-  const online = isOnline(client, now);
-  const inGame = online && Boolean(client.in_game);
-  const status = inGame
-    ? "В игре"
-    : online
-      ? "В лаунчере"
-      : "Не в сети";
-  const icon = client.icon
-    ? `<img src="${escapeHtml(client.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="${styleAttr(initials(name))}">`
-    : fallbackAvatar(name);
-  const content = Array.isArray(client.content) ? client.content : null;
-  const mods = content ? content.filter((item) => item && item.kind === "mod") : [];
-  const play = playSeconds(client, now);
-  const share = Array.isArray(all) ? playShare(client, all, now) : 0;
-  const label = inGame ? "в игре всего · сессия идёт" : "в игре всего";
-  return `
-    <article class="player">
-      <div class="player-top">
-        <div class="player-avatar">${icon}<span class="dot ${inGame ? "ingame" : online ? "on" : "off"}"></span></div>
-        <div class="player-id">
-          <div class="player-name">${escapeHtml(name)}</div>
-          <div class="player-sub">${status} · ${escapeHtml(relativeSeen(client, now))}</div>
-        </div>
-      </div>
-      <div class="player-time">
-        <div class="player-time-value">${formatPlaytime(play)}</div>
-        <div class="player-time-label">${label}</div>
-      </div>
-      <div class="player-bar"><i style="width:${share}%"></i></div>
-      <div class="player-mods">
-        ${
-          mods.length
-            ? mods.slice(0, 4).map((mod) => `<span class="chip${mod.disabled ? " off" : ""}" title="${escapeHtml(mod.title || "")}">${escapeHtml(mod.title || "мод")}</span>`).join("") +
-              (mods.length > 4 ? `<span class="chip more">+${mods.length - 4}</span>` : "")
-            : `<span class="player-mods-empty">${client.version ? `не передавали состав модов · ${escapeHtml(client.version)}` : "не передавали состав модов"}</span>`
-        }
-      </div>
-    </article>`;
-}
-
-function initials(name) {
-  return (name || "?").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2).toUpperCase() || "?";
-}
-
-function fallbackAvatar(name) {
-  const digest = hashName(name);
-  const a = 20 + (digest % 36);
-  return `<span class="player-avatar-fallback" data-fallback="${styleAttr(initials(name))}" style="--h:${a}">${escapeHtml(initials(name))}</span>`;
-}
-
-function styleAttr(text) {
-  return escapeHtml(text);
-}
-
-function hashName(name) {
-  let hash = 0;
-  const value = String(name || "?");
-  for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) % 360;
-  return hash;
+  body.innerHTML = clients.map((client) => {
+    const seen = client.last_seen ? new Date(client.last_seen * 1000).toLocaleString("ru-RU") : "—";
+    return `<tr>
+      <td><code>${escapeHtml((client.instance_id || "").slice(0, 8))}</code></td>
+      <td>${escapeHtml(client.username || "—")}</td>
+      <td>${escapeHtml(client.version || "—")} / ${escapeHtml(client.loader || "")}</td>
+      <td>${seen}</td>
+    </tr>`;
+  }).join("");
 }
 
 async function save(publish = true) {

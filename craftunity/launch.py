@@ -492,14 +492,7 @@ class Engine:
             title = str(item.get("title") or item.get("slug") or item.get("filename") or "").strip()
             if not title:
                 continue
-            project_id = str(item.get("project_id") or "")
-            entry = {"title": title[:80], "kind": kind, "disabled": bool(item.get("disabled"))}
-            if project_id and not project_id.startswith("file:"):
-                entry["project_id"] = project_id
-            slug = str(item.get("slug") or "")
-            if slug and not slug.startswith("file:"):
-                entry["slug"] = slug[:80]
-            result.append(entry)
+            result.append({"title": title[:80], "kind": kind, "disabled": bool(item.get("disabled"))})
         result.sort(key=lambda entry: (entry["kind"], entry["title"].lower()))
         return result[:400]
 

@@ -11,26 +11,6 @@ from typing import Callable
 from . import config
 
 LOCK = threading.Lock()
-PLAY_SESSION_GAP = 180
-
-
-def _track_playtime(previous: dict, now: int, in_game: bool, game_started: int) -> dict:
-    """Копит время игры: играющим считается клиент, отправляющий heartbeat чаще PLAY_SESSION_GAP."""
-    total = int(previous.get("play_seconds") or 0)
-    session = int(previous.get("session_start") or 0)
-    last_seen = int(previous.get("last_seen") or 0)
-    was_playing = bool(previous.get("playing"))
-    delta = 0
-    if was_playing and last_seen:
-        delta = min(max(0, now - last_seen), PLAY_SESSION_GAP)
-    if not in_game or now - last_seen > PLAY_SESSION_GAP:
-        total += delta
-        session = 0
-    else:
-        if not was_playing or not session:
-            session = game_started or now
-        total += delta
-    return {"play_seconds": total, "session_start": session, "playing": bool(in_game)}
 
 
 def publish_dir() -> Path:
@@ -173,9 +153,6 @@ def save_heartbeat(payload: dict) -> None:
         data = config.load_json(clients_path(), {"clients": {}})
         clients = data.setdefault("clients", {})
         previous = clients.get(key) or {}
-        now = int(time.time())
-        in_game = bool(payload.get("in_game"))
-        game_started = int(payload.get("game_started") or 0)
         clients[key] = {
             "instance_id": key,
             "username": str(payload.get("username") or previous.get("username") or "")[:32],
@@ -183,11 +160,10 @@ def save_heartbeat(payload: dict) -> None:
             "loader": str(payload.get("loader") or "")[:32],
             "icon": str(payload.get("icon") or previous.get("icon") or "")[:512],
             "started": int(payload.get("started") or previous.get("started") or 0),
-            "game_started": game_started,
-            "in_game": in_game,
-            "last_seen": now,
-            "first_seen": previous.get("first_seen") or now,
-            **_track_playtime(previous, now, in_game, game_started),
+            "game_started": int(payload.get("game_started") or 0),
+            "in_game": bool(payload.get("in_game")),
+            "last_seen": int(time.time()),
+            "first_seen": previous.get("first_seen") or int(time.time()),
         }
         config.save_json(clients_path(), data)
 
