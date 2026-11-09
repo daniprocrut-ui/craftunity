@@ -166,6 +166,31 @@ public partial class MainWindow : Window
         BackendLauncher.Shutdown();
     }
 
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        AdaptLayout(sizeInfo.NewSize.Width);
+    }
+
+    private void AdaptLayout(double width)
+    {
+        var narrow = width < 900;
+        if (narrow)
+        {
+            PlaySide.Margin = new Thickness(0, 18, 0, 0);
+            Grid.SetColumn(PlaySide, 0);
+            Grid.SetRow(PlaySide, 1);
+            PlayMain.Margin = new Thickness(0, 0, 0, 0);
+        }
+        else
+        {
+            Grid.SetColumn(PlaySide, 1);
+            Grid.SetRow(PlaySide, 0);
+            PlayMain.Margin = new Thickness(0, 0, 14, 0);
+            PlaySide.Margin = new Thickness(0);
+        }
+    }
+
     private static string ResolveApiUrl()
     {
         try

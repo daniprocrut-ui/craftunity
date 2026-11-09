@@ -1,8 +1,10 @@
 ﻿<Window x:Class="CraftunityLauncher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Craftunity Launcher" Height="760" Width="1180"
-        MinHeight="620" MinWidth="960"
+        xmlns:local="clr-namespace:CraftunityLauncher"
+        Title="Craftunity Launcher"
+        MinHeight="560" MinWidth="860"
+        Width="1180" Height="760"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BgBrush}">
@@ -97,8 +99,12 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="320"/>
                         </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                        <StackPanel x:Name="PlayMain" Grid.Column="0" Grid.Row="0" Margin="0,0,14,0">
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -156,7 +162,7 @@
                             </Border>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1">
+                        <StackPanel x:Name="PlaySide" Grid.Column="1" Grid.Row="0">
                             <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Сервер" Style="{StaticResource H2}" Margin="0,0,0,8"/>
@@ -207,11 +213,11 @@
                             </StackPanel>
                         </Border>
 
-                        <ScrollViewer x:Name="ModScroll" VerticalScrollBarVisibility="Auto" MaxHeight="2000">
+                        <ScrollViewer x:Name="ModScroll" VerticalScrollBarVisibility="Auto">
                         <ItemsControl x:Name="ModResults">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="3" Margin="0,0,-12,-12"/>
+                                    <local:ResponsiveUniformGrid Margin="0,0,-12,-12"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -300,7 +306,7 @@
                         <ItemsControl x:Name="InstalledList">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="3" Margin="0,0,-12,-12"/>
+                                    <local:ResponsiveUniformGrid Margin="0,0,-12,-12"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
