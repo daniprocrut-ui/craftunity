@@ -88,12 +88,12 @@ public static class Themes
         return Color.FromRgb((byte)((value >> 16) & 0xFF), (byte)((value >> 8) & 0xFF), (byte)(value & 0xFF));
     }
 
-    /// <summary>Текст всегда контрастен фону: на светлом — чёрный, на тёмном — белый.</summary>
+    /// <summary>На светлых темах текст чёрный, на тёмных — светлый.</summary>
     public static Palette WithContrast(Palette palette)
     {
         var light = Luminance(palette.Bg) >= 0.5;
-        var text = light ? "#0b0d12" : "#ffffff";
-        var muted = light ? Mix(text, palette.Bg, 0.35) : Mix(text, palette.Bg, 0.32);
+        var text = light ? "#0b0d12" : "#f2f5fa";
+        var muted = light ? Mix(text, palette.Bg, 0.35) : Mix(text, "#0b0d12", 0.42);
         return palette with { Text = text, Muted = muted };
     }
 

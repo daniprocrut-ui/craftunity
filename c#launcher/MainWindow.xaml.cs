@@ -227,6 +227,7 @@ public partial class MainWindow : Window
             return;
         }
         NetText.Text = "Сервер доступен";
+        await RefreshManifestAsync();
         await RefreshAsync();
         StartPolling();
     }
@@ -283,6 +284,21 @@ public partial class MainWindow : Window
                 LogText.Text = log;
                 LogScroll.ScrollToEnd();
             }
+        }
+    }
+
+    private async Task RefreshManifestAsync()
+    {
+        if (_api is null) return;
+        try
+        {
+            StatusText.Text = "Обновление манифеста…";
+            await _api.PostAsync("/api/manifest/refresh", new { });
+            StatusText.Text = "Готово";
+        }
+        catch
+        {
+            StatusText.Text = "";
         }
     }
 
