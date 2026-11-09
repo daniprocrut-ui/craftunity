@@ -346,17 +346,20 @@ class Engine:
             log_path = Path(config.game_dir()) / "logs" / f"craftunity-{time.strftime('%Y%m%d-%H%M%S')}.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handle = log_path.open("w", encoding="utf-8", errors="replace")
-            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            flags = 0
+            detached = os.name == "nt"
+            if detached:
+                flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            else:
+                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             process = subprocess.Popen(
                 command,
                 cwd=str(config.game_dir()),
-                stdout=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
                 stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                bufsize=1,
                 creationflags=flags,
+                start_new_session=not detached,
             )
             with self.lock:
                 self.process = process
@@ -381,14 +384,14 @@ class Engine:
 
     def _pump(self, process: subprocess.Popen, log_handle) -> None:
         try:
-            assert process.stdout is not None
-            for line in process.stdout:
-                self._log(line)
-                log_handle.write(line)
-                log_handle.flush()
-        finally:
             code = process.wait()
-            log_handle.close()
+        except Exception:  # noqa: BLE001
+            code = -1
+        finally:
+            try:
+                log_handle.close()
+            except Exception:  # noqa: BLE001
+                pass
             with self.lock:
                 if self.status != "error":
                     self.status = "idle" if code == 0 else "error"
