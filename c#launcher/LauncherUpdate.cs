@@ -71,7 +71,8 @@ public static class LauncherUpdate
         {
             Process.Start(new ProcessStartInfo(path)
             {
-                UseShellExecute = true,
+                UseShellExecute = false,
+                Arguments = "/SILENT /NOCANCEL /NORESTART /SP- /CLOSEAPPLICATIONS /NORESTARTAPPLICATIONS",
             });
             return true;
         }

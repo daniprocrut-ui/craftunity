@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Craftunity"
-LAUNCHER_VERSION = "1.5.2"
+LAUNCHER_VERSION = "1.5.3"
 
 GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"

@@ -91,7 +91,7 @@
 
             <!-- Экраны -->
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,0,24,8">
-                <Grid MaxWidth="1120" HorizontalAlignment="Left">
+                <Grid HorizontalAlignment="Stretch">
 
                     <!-- ИГРАТЬ -->
                     <Grid x:Name="PagePlay">
