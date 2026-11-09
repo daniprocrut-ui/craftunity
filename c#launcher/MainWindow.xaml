@@ -26,7 +26,7 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,26">
-                    <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource AccentGradient}">
+                    <Border Width="36" Height="36" CornerRadius="12" Background="{DynamicResource AccentGradient}">
                         <TextBlock Text="C" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentFgBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
@@ -83,7 +83,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Content="Тема" Click="OnThemeToggleClick" Margin="0,0,10,0"/>
-                    <Border CornerRadius="6" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
+                    <Border CornerRadius="10" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1" Padding="12,6">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Сервер " Style="{StaticResource Muted}"/>
@@ -112,8 +112,10 @@
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <Border Width="96" Height="96" CornerRadius="16" Background="{DynamicResource BgBrush}">
-                                            <Image x:Name="AvatarImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                        <Border Width="96" Height="96" CornerRadius="18" Background="{DynamicResource BgBrush}" ClipToBounds="True">
+                                            <Border CornerRadius="18" Background="{DynamicResource BgBrush}">
+                                                <Image x:Name="AvatarImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                            </Border>
                                         </Border>
                                         <StackPanel Margin="16,4,0,0">
                                             <TextBlock x:Name="HeroName" Text="Гость" FontSize="24" FontWeight="SemiBold"/>
@@ -134,7 +136,7 @@
                                     </StackPanel>
 
                                     <Border x:Name="ManifestWarn" Visibility="Collapsed" Margin="0,16,0,0" Padding="12"
-                                            CornerRadius="8" BorderBrush="#66FFC107" BorderThickness="1"
+                                            CornerRadius="12" BorderBrush="#66FFC107" BorderThickness="1"
                                             Background="#14FFC107">
                                         <TextBlock x:Name="ManifestWarnText" Foreground="#E8D9B0"/>
                                     </Border>
@@ -155,7 +157,7 @@
                                     </StackPanel>
 
                                     <Border x:Name="LogBox" Visibility="Collapsed" Margin="0,14,0,0" Padding="12"
-                                            CornerRadius="8" Background="{DynamicResource BgBrush}"
+                                            CornerRadius="12" Background="{DynamicResource BgBrush}"
                                             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" MaxHeight="220">
                                         <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
                                             <TextBlock x:Name="LogText" FontFamily="Consolas" FontSize="11"
@@ -228,9 +230,9 @@
                                     <Border Margin="0,0,12,12" Padding="16,14" Cursor="Hand"
                                             Background="{DynamicResource PanelBrush}"
                                             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
-                                            CornerRadius="14" MouseLeftButtonUp="OnCardClick">
+                                            CornerRadius="16" MouseLeftButtonUp="OnCardClick">
                                         <StackPanel HorizontalAlignment="Center">
-                                            <Border Width="96" Height="96" CornerRadius="20"
+                                            <Border Width="96" Height="96" CornerRadius="22"
                                                     Background="{DynamicResource BgBrush}" ClipToBounds="True"
                                                     HorizontalAlignment="Center">
                                                 <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
@@ -239,7 +241,7 @@
                                                        Margin="0,10,0,0" HorizontalAlignment="Center"
                                                        TextAlignment="Center" TextWrapping="Wrap" MaxHeight="38"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <Border Background="{DynamicResource CardBrush}" CornerRadius="4"
+                                            <Border Background="{DynamicResource CardBrush}" CornerRadius="8"
                                                     Padding="7,2" Margin="0,6,0,0" HorizontalAlignment="Center">
                                                 <TextBlock Text="{Binding SourceLabel}" FontSize="10"
                                                            Foreground="{DynamicResource MutedBrush}"/>
@@ -268,7 +270,7 @@
 
                         <Border x:Name="ProjectPanel" Visibility="Collapsed" Margin="0,4,0,16" Padding="18"
                                 Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="1" CornerRadius="14">
+                                BorderThickness="1" CornerRadius="16">
                             <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -276,7 +278,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Width="96" Height="96" CornerRadius="18"
+                                    <Border Grid.Column="0" Width="96" Height="96" CornerRadius="20"
                                             Background="{DynamicResource BgBrush}" ClipToBounds="True"
                                             Margin="0,0,16,0" VerticalAlignment="Top">
                                         <Image x:Name="ProjectIcon" Stretch="UniformToFill"
@@ -338,10 +340,10 @@
                                 <DataTemplate>
                                     <Border Margin="0,0,12,12" Padding="14" Background="{DynamicResource PanelBrush}"
                                             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
-                                            CornerRadius="14">
+                                            CornerRadius="16">
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal">
-                                                <Border Width="56" Height="56" CornerRadius="14"
+                                                <Border Width="56" Height="56" CornerRadius="16"
                                                         Background="{DynamicResource BgBrush}" ClipToBounds="True">
                                                     <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
                                                 </Border>
@@ -420,7 +422,7 @@
                                 <TextBlock Text="Ваш скин" Style="{StaticResource H2}"/>
                                 <TextBlock Text="PNG 64×64 (или 64×32)." Style="{StaticResource Muted}" Margin="0,6,0,0"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                                    <Border Width="160" Height="160" CornerRadius="14" Background="{DynamicResource BgBrush}">
+                                    <Border Width="160" Height="160" CornerRadius="18" Background="{DynamicResource BgBrush}">
                                         <Image x:Name="SkinImage" Stretch="Uniform"
                                                RenderOptions.BitmapScalingMode="NearestNeighbor"/>
                                     </Border>

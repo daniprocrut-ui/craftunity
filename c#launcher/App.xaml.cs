@@ -9,18 +9,39 @@ namespace CraftunityLauncher;
 public partial class App : Application
 {
     private const string SingleInstanceName = @"Global\CraftunityLauncher-7C5A2D9F";
+    private static Mutex? _sharedMutex;
     private Mutex? _singleInstance;
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    public static void ReleaseInstanceLock()
+    {
+        try
+        {
+            _sharedMutex?.ReleaseMutex();
+        }
+        catch
+        {
+            // мьютекс мог быть уже освобождён
+        }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         _singleInstance = new Mutex(true, SingleInstanceName, out var isFirst);
+        _sharedMutex = _singleInstance;
         if (!isFirst)
         {
-            BringExistingToFront();
+            if (!BringExistingToFront())
+            {
+                MessageBox.Show(
+                    "Craftunity Launcher уже запущен.\n\nЗакройте его и откройте снова.",
+                    "Craftunity",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
             Shutdown();
             return;
         }
@@ -36,19 +57,13 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        try
-        {
-            _singleInstance?.ReleaseMutex();
-        }
-        catch
-        {
-            // мьютекс мог быть уже освобождён
-        }
+        ReleaseInstanceLock();
         _singleInstance?.Dispose();
+        _sharedMutex = null;
         base.OnExit(e);
     }
 
-    private static void BringExistingToFront()
+    private static bool BringExistingToFront()
     {
         try
         {
@@ -56,12 +71,13 @@ public partial class App : Application
             {
                 if (process.Id == Environment.ProcessId || process.MainWindowHandle == IntPtr.Zero) continue;
                 SetForegroundWindow(process.MainWindowHandle);
-                return;
+                return true;
             }
         }
         catch
         {
             // окно уже закрывается
         }
+        return false;
     }
 }

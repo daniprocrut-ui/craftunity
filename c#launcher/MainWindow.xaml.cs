@@ -151,6 +151,7 @@ public partial class MainWindow : Window
             _pollCts?.Cancel();
             _api?.Dispose();
             BackendLauncher.Shutdown();
+            App.ReleaseInstanceLock();
             Close();
             Application.Current.Shutdown();
         }
@@ -1092,14 +1093,44 @@ public partial class MainWindow : Window
             if (string.IsNullOrWhiteSpace(dataUrl))
             {
                 SkinHint.Text = "Скин ещё не загружен.";
+                AvatarImage.Source = null;
                 return;
             }
-            SkinImage.Source = DecodeDataUrl(dataUrl);
+            var decoded = DecodeDataUrl(dataUrl);
+            SkinImage.Source = decoded;
+            AvatarImage.Source = CropHead(decoded);
             SkinHint.Text = "Локальный скин применён.";
         }
         catch
         {
             // скин не критичен для работы
+        }
+    }
+
+    /// <summary>Вырезает из скина 64×64 только голову вместе с волосами, а не весь скин.</summary>
+    private static BitmapSource? CropHead(BitmapSource? skin)
+    {
+        if (skin is null) return null;
+        try
+        {
+            var size = skin.PixelWidth >= 64 ? 8 : 4;
+            var scale = skin.PixelWidth / (skin.PixelWidth >= 64 ? 64 : 32);
+            var head = new CroppedBitmap(skin, new Int32Rect(8 * scale, 8 * scale, size * scale, size * scale));
+            var side = new CroppedBitmap(skin, new Int32Rect(0, 8 * scale, size * scale, size * scale));
+            var output = new DrawingVisual();
+            using (var ctx = output.RenderOpen())
+            {
+                ctx.DrawImage(head, new Rect(0, 0, 12, 12));
+                ctx.DrawImage(side, new Rect(12, 0, 12, 12));
+            }
+            var result = new RenderTargetBitmap(24, 12, 96, 96, PixelFormats.Pbgra32);
+            result.Render(output);
+            result.Freeze();
+            return result;
+        }
+        catch
+        {
+            return skin;
         }
     }
 
