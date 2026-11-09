@@ -217,7 +217,6 @@
                             </StackPanel>
                         </Border>
 
-                        <ScrollViewer x:Name="ModScroll" VerticalScrollBarVisibility="Auto">
                         <ItemsControl x:Name="ModResults">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -266,22 +265,43 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        </ScrollViewer>
 
                         <Border x:Name="ProjectPanel" Visibility="Collapsed" Margin="0,4,0,16" Padding="18"
                                 Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1" CornerRadius="14">
                             <StackPanel>
                                 <Grid>
-                                    <StackPanel>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Width="96" Height="96" CornerRadius="18"
+                                            Background="{DynamicResource BgBrush}" ClipToBounds="True"
+                                            Margin="0,0,16,0" VerticalAlignment="Top">
+                                        <Image x:Name="ProjectIcon" Stretch="UniformToFill"
+                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <TextBlock x:Name="ProjectTitle" FontSize="18" FontWeight="SemiBold"/>
                                         <TextBlock x:Name="ProjectMeta" FontSize="11.5" Margin="0,4,0,0"
                                                    Foreground="{DynamicResource MutedBrush}"/>
                                     </StackPanel>
-                                    <Button Content="Закрыть" Click="OnProjectCloseClick" HorizontalAlignment="Right"
-                                            VerticalAlignment="Top" Padding="12,6" FontSize="12"/>
+                                    <Button Grid.Column="2" Content="Закрыть" Click="OnProjectCloseClick"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Padding="12,6" FontSize="12"/>
                                 </Grid>
-                                <ScrollViewer x:Name="ProjectScroll" MaxHeight="220" Margin="0,12,0,0"
+
+                                <TextBlock x:Name="ProjectGalleryHint" Text="Скриншоты" Style="{StaticResource H2}"
+                                           Margin="0,16,0,8" Visibility="Collapsed"/>
+                                <ScrollViewer x:Name="ProjectGalleryScroll" HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Disabled" Height="180"
+                                              Visibility="Collapsed">
+                                    <StackPanel x:Name="ProjectGallery" Orientation="Horizontal"/>
+                                </ScrollViewer>
+
+                                <TextBlock Text="Описание" Style="{StaticResource H2}" Margin="0,16,0,8"/>
+                                <ScrollViewer x:Name="ProjectScroll" MaxHeight="260"
                                               VerticalScrollBarVisibility="Auto">
                                     <TextBlock x:Name="ProjectDescription" TextWrapping="Wrap" FontSize="12.5"
                                                LineHeight="19"/>
@@ -289,6 +309,7 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button Content="Установить" Style="{StaticResource PrimaryButton}"
                                             Click="OnProjectInstallClick"/>
+                                    <Button Content="Открыть страницу" Click="OnProjectPageClick" Margin="10,0,0,0"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

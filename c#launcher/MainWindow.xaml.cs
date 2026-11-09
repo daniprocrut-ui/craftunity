@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -805,15 +806,112 @@ public partial class MainWindow : Window
             var project = root.Obj("project");
             var title = project.Str("title", card.Title);
             var description = project.Str("description", card.Description);
+            var body = project.Str("body");
             var downloads = project.Num("downloads");
+            var likes = project.Num("followers");
+            var license = project.Str("license");
+            var authors = string.Join(", ", project.Arr("authors")
+                .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : item.Str("name"))
+                .Where(name => !string.IsNullOrWhiteSpace(name)));
+
             ProjectTitle.Text = title;
-            ProjectMeta.Text = "Загрузок: " + FormatCount((long)downloads)
-                               + "   ·   " + (string.IsNullOrWhiteSpace(project.Str("source")) ? "Modrinth" : project.Str("source"));
-            ProjectDescription.Text = string.IsNullOrWhiteSpace(description) ? "Описание не передано." : description;
+            var meta = new List<string>();
+            if (downloads > 0) meta.Add("Загрузок: " + FormatCount((long)downloads));
+            if (likes > 0) meta.Add("Подписок: " + FormatCount((long)likes));
+            if (!string.IsNullOrWhiteSpace(license)) meta.Add("Лицензия: " + license);
+            if (!string.IsNullOrWhiteSpace(authors)) meta.Add("Автор: " + authors);
+            ProjectMeta.Text = string.Join("   ·   ", meta);
+
+            ProjectIcon.Source = LoadImage(project.Str("icon_hd", card.IconUrl));
+            ProjectDescription.Text = BuildDescription(description, body);
+            BuildGallery(project);
             ProjectPanel.DataContext = card;
             ProjectPanel.Visibility = Visibility.Visible;
             ProjectScroll.ScrollToTop();
             Toast(title);
+        }
+        catch (Exception exc)
+        {
+            Toast(exc.Message, true);
+        }
+    }
+
+    private static string BuildDescription(string summary, string body)
+    {
+        var text = string.IsNullOrWhiteSpace(body) ? summary : body;
+        text = Regex.Replace(text ?? "", "<br\\s*/?>", "\n", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, "</p>", "\n\n", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, "<[^>]+>", "");
+        text = System.Net.WebUtility.HtmlDecode(text ?? "");
+        text = Regex.Replace(text, "[ \\t]+", " ");
+        text = Regex.Replace(text, "\\n{3,}", "\n\n");
+        text = text.Trim();
+        if (string.IsNullOrWhiteSpace(summary)) return string.IsNullOrWhiteSpace(text) ? "Описание не передано." : text;
+        if (string.IsNullOrWhiteSpace(text)) return summary;
+        if (text.StartsWith(summary, StringComparison.Ordinal)) return text;
+        return summary + "\n\n" + text;
+    }
+
+    private void BuildGallery(JsonElement project)
+    {
+        ProjectGallery.Children.Clear();
+        var frames = project.Arr("gallery");
+        foreach (var shot in frames)
+        {
+            var url = shot.ValueKind == JsonValueKind.String ? shot.GetString() : shot.Str("url");
+            var image = LoadImage(url);
+            if (image is null) continue;
+            var frame = new Border
+            {
+                Width = 260,
+                Height = 164,
+                Margin = new Thickness(0, 0, 10, 0),
+                CornerRadius = new CornerRadius(10),
+                ClipToBounds = true,
+                Background = (Brush)FindResource("BgBrush"),
+            };
+            var picture = new Image { Source = image, Stretch = Stretch.UniformToFill };
+            frame.Child = picture;
+            ProjectGallery.Children.Add(frame);
+        }
+        var hasShots = ProjectGallery.Children.Count > 0;
+        ProjectGalleryHint.Visibility = hasShots ? Visibility.Visible : Visibility.Collapsed;
+        ProjectGalleryScroll.Visibility = hasShots ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static ImageSource? LoadImage(string? url)
+    {
+        var full = string.IsNullOrWhiteSpace(url) ? "" : url;
+        if (full.StartsWith("//", StringComparison.Ordinal)) full = "https:" + full;
+        if (string.IsNullOrWhiteSpace(full)) return null;
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = new Uri(full, UriKind.Absolute);
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void OnProjectPageClick(object sender, RoutedEventArgs e)
+    {
+        if (ProjectPanel.DataContext is not ModCard card) return;
+        var id = string.IsNullOrWhiteSpace(card.ProjectId) ? card.Slug : card.ProjectId;
+        if (string.IsNullOrWhiteSpace(id)) return;
+        var url = id.StartsWith("cf:", StringComparison.OrdinalIgnoreCase)
+            ? "https://www.curseforge.com/minecraft/search?search=" + Uri.EscapeDataString(card.Title)
+            : "https://modrinth.com/mod/" + Uri.EscapeDataString(card.Slug ?? id);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch (Exception exc)
         {
