@@ -1,0 +1,549 @@
+﻿<Window x:Class="CraftunityLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Craftunity Launcher" Height="760" Width="1180"
+        MinHeight="620" MinWidth="960"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BgBrush}">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="208"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Боковое меню -->
+        <Border Grid.Column="0" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid Margin="14,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,26">
+                    <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource AccentGradient}">
+                        <TextBlock Text="C" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentFgBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Margin="10,0,0,0">
+                        <TextBlock Text="CRAFTUNITY" FontWeight="Bold" FontSize="13"/>
+                        <TextBlock Text="LAUNCHER" Style="{StaticResource Muted}" FontSize="10"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <ListBox x:Name="Nav" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                         ItemContainerStyle="{StaticResource NavItemStyle}" SelectionChanged="OnNavChanged">
+                    <ListBoxItem Content="▶  Играть"/>
+                    <ListBoxItem Content="◀  Контент"/>
+                    <ListBoxItem Content="▣  Установлено"/>
+                    <ListBoxItem Content="▤  Файлы"/>
+                    <ListBoxItem Content="☻  Скин"/>
+                    <ListBoxItem Content="◉  Аккаунт"/>
+                    <ListBoxItem Content="⚙  Настройки"/>
+                </ListBox>
+
+                <StackPanel Grid.Row="2">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Ellipse x:Name="NetDot" Width="8" Height="8" Fill="{DynamicResource AccentBrush}"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock x:Name="NetText" Text="Проверка сети…" Style="{StaticResource Muted}"
+                                   Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource Muted}" FontSize="11">
+                        <Run Text="Версия лаунчера "/><Run x:Name="LauncherVerRun" Text="—"/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource Muted}" FontSize="11" Text="craftunity.mcsh.io"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Основная часть -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Топбар -->
+            <Grid Grid.Row="0" Margin="24,18,24,8">
+                <StackPanel>
+                    <TextBlock x:Name="ViewTitle" Text="Играть" Style="{StaticResource H1}"/>
+                    <TextBlock x:Name="ViewSub" Text="Craftunity — один клиент, один сервер"
+                               Style="{StaticResource Muted}" Margin="0,2,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Content="Тема" Click="OnThemeToggleClick" Margin="0,0,10,0"/>
+                    <Border CornerRadius="6" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="1" Padding="12,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Сервер " Style="{StaticResource Muted}"/>
+                            <TextBlock x:Name="ServerPill" Text="—" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- Экраны -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,0,24,8">
+                <Grid MaxWidth="1120" HorizontalAlignment="Left">
+
+                    <!-- ИГРАТЬ -->
+                    <Grid x:Name="PagePlay">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="320"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="96" Height="96" CornerRadius="16" Background="{DynamicResource BgBrush}">
+                                            <Image x:Name="AvatarImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                        </Border>
+                                        <StackPanel Margin="16,4,0,0">
+                                            <TextBlock x:Name="HeroName" Text="Гость" FontSize="24" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="HeroType" Text="Аккаунт не выбран" Style="{StaticResource Muted}"
+                                                       Margin="0,2,0,10"/>
+                                            <WrapPanel x:Name="HeroChips"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                                        <Button x:Name="PlayButton" Content="Играть" Style="{StaticResource PrimaryButton}"
+                                                Click="OnPlayClick"/>
+                                        <Button x:Name="StopButton" Content="Остановить" Click="OnStopClick"
+                                                Margin="10,0,0,0" Visibility="Collapsed"/>
+                                        <TextBlock x:Name="PlayHint" Text="Выберите аккаунт, чтобы начать"
+                                                   Style="{StaticResource Muted}" VerticalAlignment="Center"
+                                                   Margin="14,0,0,0"/>
+                                    </StackPanel>
+
+                                    <Border x:Name="ManifestWarn" Visibility="Collapsed" Margin="0,16,0,0" Padding="12"
+                                            CornerRadius="8" BorderBrush="#66FFC107" BorderThickness="1"
+                                            Background="#14FFC107">
+                                        <TextBlock x:Name="ManifestWarnText" Foreground="#E8D9B0"/>
+                                    </Border>
+
+                                    <StackPanel Margin="0,18,0,0">
+                                        <ProgressBar x:Name="ProgressBar" Minimum="0" Maximum="100" Value="0"/>
+                                        <Grid Margin="0,6,0,0">
+                                            <TextBlock x:Name="ProgressStage" Text="—" Style="{StaticResource Muted}"/>
+                                            <TextBlock x:Name="ProgressPct" Text="0%" Style="{StaticResource Muted}"
+                                                       HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                        <Button Content="Показать лог" Click="OnLogToggleClick" Margin="0,0,8,0"/>
+                                        <Button Content="Проверить файлы" Click="OnRepairClick" Margin="0,0,8,0"/>
+                                        <Button Content="Обновить манифест" Click="OnRefreshManifestClick"/>
+                                    </StackPanel>
+
+                                    <Border x:Name="LogBox" Visibility="Collapsed" Margin="0,14,0,0" Padding="12"
+                                            CornerRadius="8" Background="{DynamicResource BgBrush}"
+                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" MaxHeight="220">
+                                        <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
+                                            <TextBlock x:Name="LogText" FontFamily="Consolas" FontSize="11"
+                                                       Foreground="{DynamicResource MutedBrush}"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1">
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Сервер" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                                    <TextBlock x:Name="ServerCard" Text="Загрузка манифеста…" Style="{StaticResource Muted}"/>
+                                    <Button Content="Скопировать IP" Click="OnCopyServerClick" Margin="0,12,0,0"
+                                            HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Состояние клиента" Style="{StaticResource H2}" Margin="0,0,0,8"/>
+                                    <StackPanel x:Name="ClientState"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- КОНТЕНТ -->
+                    <StackPanel x:Name="PageMods" Visibility="Collapsed">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock x:Name="ContentTitle" Text="Установка модов" Style="{StaticResource H2}"/>
+                                <TextBlock x:Name="ContentHint" Text="Моды берутся из каталога Modrinth и ставятся в папку mods."
+                                           Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Content="Моды" Click="OnKindModClick" Margin="0,0,6,0"/>
+                                    <Button Content="Ресурспаки" Click="OnKindRpClick" Margin="0,0,6,0"/>
+                                    <Button Content="Шейдеры" Click="OnKindShaderClick"/>
+                                </StackPanel>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ModQuery" Grid.Column="0" Margin="0,0,8,0" KeyDown="OnSearchKeyDown"/>
+                                    <ComboBox x:Name="ModSort" Grid.Column="1" Width="170" Margin="0,0,8,0" SelectedIndex="0">
+                                        <ComboBoxItem Content="По релевантности" Tag="relevance"/>
+                                        <ComboBoxItem Content="По загрузкам" Tag="downloads"/>
+                                        <ComboBoxItem Content="Новые" Tag="newest"/>
+                                        <ComboBoxItem Content="Обновлённые" Tag="updated"/>
+                                    </ComboBox>
+                                    <Button Content="Найти" Grid.Column="2" Click="OnSearchClick" Margin="0,0,8,0"/>
+                                    <Button x:Name="UploadPackButton" Grid.Column="3" Content="Добавить .jar" Click="OnUploadPackClick"/>
+                                </Grid>
+                                <TextBlock x:Name="ModFilter" Style="{StaticResource Muted}" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <ScrollViewer x:Name="ModScroll" VerticalScrollBarVisibility="Auto" MaxHeight="2000">
+                        <ItemsControl x:Name="ModResults">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="3" Margin="0,0,-12,-12"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,12,12" Padding="16,14" Cursor="Hand"
+                                            Background="{DynamicResource PanelBrush}"
+                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+                                            CornerRadius="14" MouseLeftButtonUp="OnCardClick">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <Border Width="96" Height="96" CornerRadius="20"
+                                                    Background="{DynamicResource BgBrush}" ClipToBounds="True"
+                                                    HorizontalAlignment="Center">
+                                                <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
+                                                       Margin="0,10,0,0" HorizontalAlignment="Center"
+                                                       TextAlignment="Center" TextWrapping="Wrap" MaxHeight="38"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Border Background="{DynamicResource CardBrush}" CornerRadius="4"
+                                                    Padding="7,2" Margin="0,6,0,0" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding SourceLabel}" FontSize="10"
+                                                           Foreground="{DynamicResource MutedBrush}"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding AuthorLabel}" FontSize="11" Margin="0,6,0,0"
+                                                       Foreground="{DynamicResource MutedBrush}"
+                                                       HorizontalAlignment="Center" TextAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" MaxWidth="220"/>
+                                            <TextBlock Text="{Binding Description}" FontSize="11.5" Margin="0,8,0,0"
+                                                       LineHeight="17" Foreground="{DynamicResource MutedBrush}"
+                                                       TextWrapping="Wrap" TextAlignment="Center"
+                                                       MaxHeight="36" TextTrimming="CharacterEllipsis"/>
+                                            <Grid Margin="0,12,0,0" Width="240">
+                                                <TextBlock Text="{Binding DownloadsLabel}" FontSize="11"
+                                                           Foreground="{DynamicResource MutedBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Content="{Binding ActionLabel}" Tag="{Binding}"
+                                                        Click="OnInstallCardClick" HorizontalAlignment="Right"
+                                                        IsEnabled="{Binding CanInstall}" Padding="12,6" FontSize="12"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        </ScrollViewer>
+
+                        <Border x:Name="ProjectPanel" Visibility="Collapsed" Margin="0,4,0,16" Padding="18"
+                                Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
+                                BorderThickness="1" CornerRadius="14">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock x:Name="ProjectTitle" FontSize="18" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="ProjectMeta" FontSize="11.5" Margin="0,4,0,0"
+                                                   Foreground="{DynamicResource MutedBrush}"/>
+                                    </StackPanel>
+                                    <Button Content="Закрыть" Click="OnProjectCloseClick" HorizontalAlignment="Right"
+                                            VerticalAlignment="Top" Padding="12,6" FontSize="12"/>
+                                </Grid>
+                                <ScrollViewer x:Name="ProjectScroll" MaxHeight="220" Margin="0,12,0,0"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <TextBlock x:Name="ProjectDescription" TextWrapping="Wrap" FontSize="12.5"
+                                               LineHeight="19"/>
+                                </ScrollViewer>
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Content="Установить" Style="{StaticResource PrimaryButton}"
+                                            Click="OnProjectInstallClick"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Button x:Name="ModMore" Content="Показать ещё" Click="OnSearchMoreClick"
+                                HorizontalAlignment="Center" Margin="0,4,0,16" Visibility="Collapsed"/>
+                    </StackPanel>
+
+                    <!-- УСТАНОВЛЕНО -->
+                    <StackPanel x:Name="PageInstalled" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <Button Content="Всё" Click="OnFilterAllClick" Margin="0,0,6,0"/>
+                            <Button Content="Моды" Click="OnFilterModClick" Margin="0,0,6,0"/>
+                            <Button Content="Ресурспаки" Click="OnFilterRpClick" Margin="0,0,6,0"/>
+                            <Button Content="Шейдеры" Click="OnFilterShaderClick" Margin="0,0,6,0"/>
+                            <Button Content="Обновить" Click="OnReloadInstalledClick"/>
+                        </StackPanel>
+                        <TextBlock x:Name="InstalledHint" Style="{StaticResource Muted}" Margin="0,0,0,12"/>
+                        <ItemsControl x:Name="InstalledList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="3" Margin="0,0,-12,-12"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,12,12" Padding="14" Background="{DynamicResource PanelBrush}"
+                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+                                            CornerRadius="14">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="56" Height="56" CornerRadius="14"
+                                                        Background="{DynamicResource BgBrush}" ClipToBounds="True">
+                                                    <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
+                                                </Border>
+                                                <StackPanel Margin="12,0,0,0" Width="200">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13.5"
+                                                               TextWrapping="Wrap" MaxHeight="38"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding KindLabel}" FontSize="11" Margin="0,3,0,0"
+                                                               Foreground="{DynamicResource MutedBrush}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Description}" FontSize="11.5" Margin="0,10,0,0"
+                                                       LineHeight="17" MaxHeight="36" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource MutedBrush}"
+                                                       Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}"/>
+                                            <TextBlock Text="{Binding StateLabel}" FontSize="11" Margin="0,8,0,0"
+                                                       Foreground="{DynamicResource MutedBrush}"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                                <Button Content="{Binding ToggleLabel}" Tag="{Binding}"
+                                                        Click="OnToggleInstalledClick" Margin="0,0,8,0" Padding="12,5"
+                                                        FontSize="12"/>
+                                                <Button Content="Удалить" Tag="{Binding}"
+                                                        Click="OnRemoveInstalledClick" IsEnabled="{Binding CanRemove}"
+                                                        Padding="12,6" FontSize="12"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- ФАЙЛЫ -->
+                    <Grid x:Name="PageFiles" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
+                            <StackPanel>
+                                <TextBlock Text="Игровые файлы" Style="{StaticResource H2}"/>
+                                <TextBlock Text="Киньте конфиги, настройки, миры или другие файлы — они попадут в папку игры."
+                                           Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Куда положить" Style="{StaticResource Muted}" Margin="0,16,0,4"/>
+                                <ComboBox x:Name="FileDest" SelectedIndex="0" SelectionChanged="OnFileDestChanged">
+                                    <ComboBoxItem Content="Корень игры" Tag="game"/>
+                                    <ComboBoxItem Content="config" Tag="config"/>
+                                    <ComboBoxItem Content="mods" Tag="mods"/>
+                                    <ComboBoxItem Content="resourcepacks" Tag="resourcepacks"/>
+                                    <ComboBoxItem Content="shaderpacks" Tag="shaderpacks"/>
+                                    <ComboBoxItem Content="saves" Tag="saves"/>
+                                </ComboBox>
+                                <Button Content="Выбрать файлы…" Click="OnFilesUploadClick" Margin="0,16,0,0"
+                                        HorizontalAlignment="Left"/>
+                                <Button Content="Открыть папку игры" Click="OnOpenGameDirClick" Margin="0,8,0,0"
+                                        HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="В выбранной папке" Style="{StaticResource H2}"/>
+                                <TextBlock x:Name="FileDestHint" Text="—" Style="{StaticResource Muted}" Margin="0,6,0,10"/>
+                                <ItemsControl x:Name="FileList"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- СКИН -->
+                    <Grid x:Name="PageSkin" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
+                            <StackPanel>
+                                <TextBlock Text="Ваш скин" Style="{StaticResource H2}"/>
+                                <TextBlock Text="PNG 64×64 (или 64×32)." Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Border Width="160" Height="160" CornerRadius="14" Background="{DynamicResource BgBrush}">
+                                        <Image x:Name="SkinImage" Stretch="Uniform"
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                    </Border>
+                                    <StackPanel Margin="16,0,0,0">
+                                        <TextBlock Text="Модель" Style="{StaticResource Muted}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="SkinModel" SelectedIndex="0" Width="180">
+                                            <ComboBoxItem Content="Classic (Steve)" Tag="classic"/>
+                                            <ComboBoxItem Content="Slim (Alex)" Tag="slim"/>
+                                        </ComboBox>
+                                        <Button Content="Выбрать PNG…" Click="OnSkinPickClick" Margin="0,12,0,0"/>
+                                        <Button Content="Применить локально" Click="OnSkinApplyClick" Margin="0,8,0,0"/>
+                                        <Button Content="Скин на ely.by" Click="OnSkinElyClick" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock x:Name="SkinHint" Style="{StaticResource Muted}" Margin="0,14,0,0"
+                                           Text="Скин ещё не загружен."/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Где применяется скин" Style="{StaticResource H2}"/>
+                                <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                                           Text="Локальный скин хранится в папке лаунчера и виден вам. На сервере Craftunity скин показывается, если вы вошли через ely.by или администратор включил серверный плагин скинов."/>
+                                <Button Content="Открыть папку данных" Click="OnOpenDataFolderClick" Margin="0,16,0,0"
+                                        HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- АККАУНТ -->
+                    <Grid x:Name="PageAccount" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,14,0">
+                            <StackPanel>
+                                <TextBlock Text="Оффлайн-аккаунт" Style="{StaticResource H2}"/>
+                                <TextBlock Text="Ник для игры без авторизации. Подходит для серверов с online-mode=false."
+                                           Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Ник (3–16 символов)" Style="{StaticResource Muted}" Margin="0,16,0,4"/>
+                                <TextBox x:Name="OfflineName" MaxLength="16"/>
+                                <Button Content="Играть оффлайн" Click="OnOfflineLoginClick" Margin="0,12,0,0"
+                                        HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Аккаунт ely.by" Style="{StaticResource H2}"/>
+                                <TextBlock Text="Скины, плащи и авторизация на сервере."
+                                           Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Логин или e-mail" Style="{StaticResource Muted}" Margin="0,16,0,4"/>
+                                <TextBox x:Name="ElyLogin"/>
+                                <TextBlock Text="Пароль" Style="{StaticResource Muted}" Margin="0,10,0,4"/>
+                                <PasswordBox x:Name="ElyPassword" Padding="10,8" Background="{DynamicResource PanelBrush}"
+                                             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Content="Войти через ely.by" Style="{StaticResource PrimaryButton}"
+                                            Click="OnElyLoginClick" Margin="0,0,8,0"/>
+                                    <Button Content="Регистрация" Click="OnElyRegisterClick" Margin="0,0,8,0"/>
+                                    <Button Content="Выйти" Click="OnLogoutClick"/>
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource Muted}" Margin="0,12,0,0"
+                                           Text="Пароль передаётся напрямую на authserver.ely.by и не сохраняется."/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- НАСТРОЙКИ -->
+                    <StackPanel x:Name="PageSettings" Visibility="Collapsed">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Внешний вид" Style="{StaticResource H2}"/>
+                                <TextBlock Text="Тема применяется сразу и сохраняется в настройках лаунчера."
+                                           Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <WrapPanel x:Name="ThemeTiles" Margin="0,12,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <CheckBox x:Name="OptReduceMotion" Content="Уменьшить анимации"
+                                              Foreground="{DynamicResource TextBrush}" Margin="0,0,20,0"/>
+                                    <CheckBox x:Name="OptAutoJava" Content="Автоматически скачивать Java"
+                                              Foreground="{DynamicResource TextBrush}" Margin="0,0,20,0"/>
+                                    <CheckBox x:Name="OptAutoJoin" Content="Автовход на сервер"
+                                              Foreground="{DynamicResource TextBrush}" Margin="0,0,20,0"/>
+                                    <CheckBox x:Name="OptHoliday" Content="Праздничное оформление"
+                                              Foreground="{DynamicResource TextBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,14,0">
+                                <StackPanel>
+                                    <TextBlock Text="Каталоги модов" Style="{StaticResource H2}"/>
+                                    <TextBlock Text="Поиск идёт по Modrinth и CurseForge. Дубли ставятся с Modrinth."
+                                               Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                    <TextBlock Text="Ключ CurseForge API" Style="{StaticResource Muted}" Margin="0,14,0,4"/>
+                                    <TextBox x:Name="CurseforgeKey"/>
+                                    <TextBlock x:Name="CurseforgeState" Style="{StaticResource Muted}" Margin="0,8,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                        <Button Content="Получить ключ" Click="OnCurseforgeHelpClick" Margin="0,0,8,0"/>
+                                        <Button Content="Проверить и сохранить" Click="OnCurseforgeSaveClick"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Игра" Style="{StaticResource H2}"/>
+                                    <TextBlock Text="Память (МБ)" Style="{StaticResource Muted}" Margin="0,14,0,4"/>
+                                    <TextBox x:Name="SetMemory"/>
+                                    <TextBlock Text="Java" Style="{StaticResource Muted}" Margin="0,10,0,4"/>
+                                    <TextBox x:Name="SetJava"/>
+                                    <TextBlock Text="Версия клиента (задаётся админ-панелью)"
+                                               Style="{StaticResource Muted}" Margin="0,10,0,4"/>
+                                    <TextBox x:Name="SetVersion" IsReadOnly="True"/>
+                                    <TextBlock Text="Адрес сервера" Style="{StaticResource Muted}" Margin="0,10,0,4"/>
+                                    <TextBox x:Name="SetServer" IsReadOnly="True"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                        <Button Content="Сохранить" Style="{StaticResource PrimaryButton}"
+                                                Click="OnSaveSettingsClick" Margin="0,0,8,0"/>
+                                        <Button Content="Папка игры" Click="OnOpenGameDirClick" Margin="0,0,8,0"/>
+                                        <Button Content="Логи" Click="OnOpenLogsClick"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Манифест и обновления" Style="{StaticResource H2}"/>
+                                <TextBlock Text="Адрес находится автоматически: маяк админ-панели в локальной сети, затем сохранённая копия."
+                                           Style="{StaticResource Muted}" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="ManifestAuto" Style="{StaticResource Muted}" Margin="0,12,0,0"/>
+                                <Button Content="Обновить манифест" Click="OnRefreshManifestClick" Margin="0,12,0,0"
+                                        HorizontalAlignment="Left"/>
+                                <TextBlock x:Name="ManifestInfo" Style="{StaticResource Muted}" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Строка состояния -->
+            <Border Grid.Row="2" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
+                    BorderThickness="0,1,0,0" Padding="28,8">
+                <Grid>
+                    <TextBlock x:Name="StatusText" Text="Готово" Style="{StaticResource Muted}"/>
+                    <TextBlock x:Name="StatusVersion" Text="—" Style="{StaticResource Muted}"
+                               HorizontalAlignment="Right"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
