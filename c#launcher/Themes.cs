@@ -93,7 +93,7 @@ public static class Themes
     {
         var light = Luminance(palette.Bg) >= 0.5;
         var text = light ? "#0b0d12" : "#f2f5fa";
-        var muted = light ? Mix(text, palette.Bg, 0.35) : Mix(text, "#0b0d12", 0.42);
+        var muted = light ? Mix(text, palette.Bg, 0.35) : Mix(text, palette.Panel, 0.30);
         return palette with { Text = text, Muted = muted };
     }
 
