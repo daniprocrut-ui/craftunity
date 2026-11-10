@@ -360,30 +360,48 @@ class Installer:
         return {"libraries": repaired_libraries, "assets": repaired_assets}
 
 
-def detect_java() -> str:
+def java_candidates() -> list[Path]:
+    """Все найденные java.exe: свой рантайм лаунчера первым, остальные — по порядку."""
     candidates: list[Path] = []
     explicit = os.environ.get("CRAFTUNITY_JAVA")
     if explicit and Path(explicit).exists():
-        return explicit
+        candidates.append(Path(explicit))
+    own = config.data_dir() / "runtime"
+    if own.exists():
+        candidates.extend(sorted(own.glob("**/bin/java.exe"), reverse=True))
     java_home = os.environ.get("JAVA_HOME")
     if java_home:
         candidates.append(Path(java_home) / "bin" / "java.exe")
     for base in (
-        Path("C:/Program Files/Java"),
         Path("C:/Program Files/Eclipse Adoptium"),
         Path("C:/Program Files/Microsoft"),
         Path("C:/Program Files/BellSoft"),
         Path("C:/Program Files/Zulu"),
         Path(os.environ.get("APPDATA", "")) / ".minecraft" / "runtime",
-        config.data_dir() / "runtime",
+        Path("C:/Program Files/Java"),
     ):
         if base.exists():
             candidates.extend(sorted(base.glob("**/bin/java.exe"), reverse=True))
     which = shutil.which("java")
     if which:
         candidates.append(Path(which))
+    seen: set[str] = set()
+    unique: list[Path] = []
     for candidate in candidates:
-        if candidate and candidate.exists():
+        if not candidate:
+            continue
+        key = str(candidate).lower()
+        if key in seen or not candidate.exists():
+            continue
+        seen.add(key)
+        unique.append(candidate)
+    return unique
+
+
+def detect_java(required: int = 0) -> str:
+    """Ищет Java подходящей версии; при required=0 возвращает первую найденную."""
+    for candidate in java_candidates():
+        if required <= 0 or java_major(str(candidate)) >= required:
             return str(candidate)
     return ""
 
@@ -415,10 +433,16 @@ def java_major(java_path: str) -> int:
 
 
 def required_java_major(game_version: str) -> int:
-    try:
-        major = int(game_version.split(".")[1])
-    except (IndexError, ValueError):
-        return 17
+    parts = [chunk for chunk in str(game_version or "").split(".") if chunk.isdigit()]
+    if not parts:
+        return 21
+    # «1.16.5» — старая схема версий, «26.2» — новая: у неё мажор и есть версия игры.
+    if parts[0] == "1" and len(parts) > 1:
+        major = int(parts[1])
+    else:
+        major = int(parts[0])
+    if major >= 24:
+        return 25
     if major >= 20:
         return 21
     if major >= 18:

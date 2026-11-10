@@ -323,8 +323,15 @@ class Engine:
                 account = state.current_account() or account
             settings = config.load_settings()
             required = installer.required_java_major(info["version"])
-            java = settings.get("java_path") or installer.detect_java()
+            java = settings.get("java_path") or installer.detect_java(required)
             major = installer.java_major(java) if java else 0
+            if not java or major < required:
+                from . import java as java_module
+
+                cached = java_module.cached_runtime(required)
+                if cached:
+                    java = cached
+                    major = installer.java_major(java)
             if not java or major < required:
                 if settings.get("auto_java", True):
                     from . import java as java_module
@@ -340,6 +347,7 @@ class Engine:
                 raise LauncherError(
                     f"Найдена Java {major or '—'}, а для Minecraft {info['version']} нужна Java {required}+."
                 )
+            self._log(f"[launcher] Java подходит: {major} ({java})")
             self._set("starting", "launch", 0.97, "Запуск Minecraft…")
             self.started_at = time.time()
             command = self.build_command(account, java)
