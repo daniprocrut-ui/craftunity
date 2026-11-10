@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import hashlib
@@ -704,7 +704,7 @@ class AdminApp:
         ttk.Label(
             card,
             text="Сервер нужен только для локальной сети и отладки: кнопка «Сохранить и опубликовать» "
-                 "сама кладёт подписанный манифест в папку сервера Dropbox. "
+                 "подписывает манифест и готовит его к раздаче лаунчерам. "
                  "0.0.0.0 — слушать все интерфейсы; 127.0.0.1 — только этот компьютер.",
             style="CardMuted.TLabel",
             wraplength=780,
@@ -907,21 +907,21 @@ class AdminApp:
             except LauncherError as exc:
                 pack_note = f"\nФайлы модпака не ушли на сайт: {exc}"
         if target is not None:
-            self.set_status(f"Опубликовано: сборка {saved.get('version')} — в папке сервера Dropbox")
+            self.set_status(f"Опубликовано: сборка {saved.get('version')} — подписана и готова к раздаче")
             messagebox.showinfo(
                 "Craftunity Admin",
                 f"Сборка {saved.get('version')} опубликована и подписана.\n\n"
-                f"Папка сервера: {target}\n"
-                "Файлы уйдут в облако при синхронизации Dropbox — сервер в админке держать не нужно."
+                f"Файлы: {target}\n"
+                "Манифест и подпись раздаются лаунчерам с сайта; сервер в админке держать не нужно."
                 + pack_note,
             )
             return
-        self.set_status(f"Опубликовано: сборка {saved.get('version')} — подпись обновлена")
+        self.set_status(f"Опубликовано: сборка {saved.get('version')} — подпись обновлена, файлы готовы")
         messagebox.showinfo(
             "Craftunity Admin",
             f"Сборка {saved.get('version')} опубликована и подписана.\n\n"
             f"Файлы: {publish_dir()}\n"
-            "Папка Dropbox не найдена — скопируйте файлы на хостинг вручную."
+            "Скопируйте manifest.json и manifest.json.sig в папку docs репозитория и запушьте."
             + pack_note,
         )
 
