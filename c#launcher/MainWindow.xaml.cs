@@ -604,10 +604,16 @@ public partial class MainWindow : Window
 
             foreach (var item in items)
             {
-                var match = _installedFilter == "all" || string.Equals(item.Kind, _installedFilter, StringComparison.OrdinalIgnoreCase);
+                var isMod = string.Equals(item.Kind, "mod", StringComparison.OrdinalIgnoreCase);
+                var inPack = isMod && packIds.Contains(item.ProjectId);
+                var match = _installedFilter switch
+                {
+                    "all" => true,
+                    "pack" => inPack,
+                    _ => string.Equals(item.Kind, _installedFilter, StringComparison.OrdinalIgnoreCase),
+                };
                 if (!match) continue;
-                var locked = string.Equals(item.Kind, "mod", StringComparison.OrdinalIgnoreCase)
-                             && packIds.Contains(item.ProjectId);
+                var locked = inPack;
                 _installed.Add(new InstalledCard
                 {
                     Title = item.Title,
@@ -616,6 +622,7 @@ public partial class MainWindow : Window
                     KindLabel = KindName(item.Kind),
                     StateLabel = item.Disabled ? "Мод выключен" : "Мод включён",
                     ToggleLabel = item.Disabled ? "Включить" : "Выключить",
+                    CanToggle = !locked,
                     CanRemove = !locked && item.Removable,
                     Data = item,
                 });
@@ -641,6 +648,7 @@ public partial class MainWindow : Window
     private async void OnReloadInstalledClick(object sender, RoutedEventArgs e) => await ReloadInstalledAsync();
     private async void OnFilterAllClick(object sender, RoutedEventArgs e) { _installedFilter = "all"; await ReloadInstalledAsync(); }
     private async void OnFilterModClick(object sender, RoutedEventArgs e) { _installedFilter = "mod"; await ReloadInstalledAsync(); }
+    private async void OnFilterPackClick(object sender, RoutedEventArgs e) { _installedFilter = "pack"; await ReloadInstalledAsync(); }
     private async void OnFilterRpClick(object sender, RoutedEventArgs e) { _installedFilter = "resourcepack"; await ReloadInstalledAsync(); }
     private async void OnFilterShaderClick(object sender, RoutedEventArgs e) { _installedFilter = "shader"; await ReloadInstalledAsync(); }
 

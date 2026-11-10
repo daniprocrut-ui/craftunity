@@ -325,6 +325,7 @@
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                             <Button Content="Всё" Click="OnFilterAllClick" Margin="0,0,6,0"/>
                             <Button Content="Моды" Click="OnFilterModClick" Margin="0,0,6,0"/>
+                            <Button Content="Модпак" Click="OnFilterPackClick" Margin="0,0,6,0"/>
                             <Button Content="Ресурспаки" Click="OnFilterRpClick" Margin="0,0,6,0"/>
                             <Button Content="Шейдеры" Click="OnFilterShaderClick" Margin="0,0,6,0"/>
                             <Button Content="Обновить" Click="OnReloadInstalledClick"/>
@@ -364,7 +365,7 @@
                                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                                 <Button Content="{Binding ToggleLabel}" Tag="{Binding}"
                                                         Click="OnToggleInstalledClick" Margin="0,0,8,0" Padding="12,5"
-                                                        FontSize="12"/>
+                                                        FontSize="12" IsEnabled="{Binding CanToggle}"/>
                                                 <Button Content="Удалить" Tag="{Binding}"
                                                         Click="OnRemoveInstalledClick" IsEnabled="{Binding CanRemove}"
                                                         Padding="12,6" FontSize="12"/>
