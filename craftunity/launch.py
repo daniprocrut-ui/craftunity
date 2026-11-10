@@ -407,6 +407,16 @@ class Engine:
                     if code != 0:
                         self.last_error = self.message
 
+    def _local_skin_icon(self) -> str:
+        """Картинка скина из кэша, если ника нет или он офлайн."""
+        try:
+            from . import skins as skins_module
+
+            local = skins_module.local_skin() or {}
+            return str(local.get("data_url") or "")
+        except Exception:  # noqa: BLE001
+            return ""
+
     def report_presence(self) -> None:
         """Отправляет админке сведения о клиенте без запуска игры."""
         manifest = self.manifest or self.refresh_manifest()
@@ -528,10 +538,12 @@ class Engine:
 
     def _heartbeat(self, info: dict) -> None:
         account = state.current_account() or {}
-        username = account.get("username")
+        username = str(account.get("username") or "").strip()
         icon = ""
-        if username:
-            icon = "https://skinsystem.ely.by/skins/" + urllib.parse.quote(str(username))
+        if account.get("type") == "ely" and username:
+            icon = "https://skinsystem.ely.by/skins/" + urllib.parse.quote(username)
+        if not icon:
+            icon = self._local_skin_icon()
         payload = {
             "instance_id": state.instance_id(),
             "version": info.get("version"),

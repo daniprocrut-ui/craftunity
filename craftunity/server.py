@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import mimetypes
@@ -35,6 +35,14 @@ def _read_clients() -> dict:
 
 def _write_clients(data: dict) -> None:
     config.save_json(_clients_path(), data)
+
+
+def _presence_after_login() -> None:
+    """После входа сразу сообщаем админке ник и скин, не дожидаясь минутного цикла."""
+    try:
+        ENGINE.report_presence()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _overview() -> dict:
@@ -195,10 +203,12 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/account/offline":
                 data = self._read_json()
                 account = state.set_offline_account((data.get("username") or "").strip())
+                _presence_after_login()
                 return self._send({"ok": True, "account": account})
             if path == "/api/account/ely":
                 data = self._read_json()
                 account = auth.ely_authenticate((data.get("username") or "").strip(), data.get("password") or "")
+                _presence_after_login()
                 return self._send({"ok": True, "account": account})
             if path == "/api/account/logout":
                 state.logout()

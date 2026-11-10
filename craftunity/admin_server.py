@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import threading
@@ -74,7 +74,16 @@ def read_remote_clients(timeout: int = 12) -> list[dict]:
     clients = payload.get("clients") if isinstance(payload, dict) else None
     if not isinstance(clients, list):
         return []
-    return [item for item in clients if isinstance(item, dict)]
+    normalized = []
+    for item in clients:
+        if not isinstance(item, dict):
+            continue
+        entry = dict(item)
+        entry["username"] = str(entry.get("username") or "").strip()
+        entry["icon"] = str(entry.get("icon") or "")
+        normalized.append(entry)
+    return normalized
+
 
 
 def clients_for_admin() -> list[dict]:
