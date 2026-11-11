@@ -95,7 +95,7 @@
             </Grid>
 
             <!-- Экраны -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,0,24,8">
+            <ScrollViewer x:Name="PageScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,0,24,8">
                 <Grid HorizontalAlignment="Stretch">
 
                     <!-- ИГРАТЬ -->
@@ -494,7 +494,8 @@
                     </Grid>
 
                     <!-- ЧАТ -->
-                    <Grid x:Name="PageChat" Visibility="Collapsed">
+                    <Grid x:Name="PageChat" Visibility="Collapsed" VerticalAlignment="Stretch"
+                          Margin="0,0,0,8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
@@ -512,7 +513,10 @@
                         </Border>
 
                         <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
-                            <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          CanContentScroll="False" Padding="0,0,8,0"
+                                          PanningMode="VerticalOnly">
                                 <ItemsControl x:Name="ChatList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>

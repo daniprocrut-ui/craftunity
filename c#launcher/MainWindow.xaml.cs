@@ -486,6 +486,11 @@ public partial class MainWindow : Window
         PageSkin.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
         PageAccount.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
         PageChat.Visibility = index == 6 ? Visibility.Visible : Visibility.Collapsed;
+        // На вкладке чата прокручивается только лента сообщений, а не вся страница:
+        // внешний скролл экранов иначе растягивает чат и уводит поле ввода за экран.
+        PageScroll.VerticalScrollBarVisibility = index == 6
+            ? ScrollBarVisibility.Disabled
+            : ScrollBarVisibility.Auto;
         PageSettings.Visibility = index == 7 ? Visibility.Visible : Visibility.Collapsed;
 
         switch (index)
