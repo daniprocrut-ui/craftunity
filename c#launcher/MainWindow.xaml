@@ -44,6 +44,7 @@
                     <ListBoxItem Content="▤  Файлы"/>
                     <ListBoxItem Content="☻  Скин"/>
                     <ListBoxItem Content="◉  Аккаунт"/>
+                    <ListBoxItem Content="✉  Чат"/>
                     <ListBoxItem Content="⚙  Настройки"/>
                 </ListBox>
 
@@ -490,6 +491,74 @@
                                            Text="Пароль передаётся напрямую на authserver.ely.by и не сохраняется."/>
                             </StackPanel>
                         </Border>
+                    </Grid>
+
+                    <!-- ЧАТ -->
+                    <Grid x:Name="PageChat" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Общий чат лаунчера" Style="{StaticResource H2}" VerticalAlignment="Center"/>
+                                <Button Content="Обновить" Click="OnChatRefreshClick" Margin="16,0,0,0" Padding="14,6"
+                                        FontSize="12"/>
+                                <TextBlock x:Name="ChatState" Style="{StaticResource Muted}" VerticalAlignment="Center"
+                                           Margin="14,0,0,0" Text="Загрузка…"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="ChatList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,10" Padding="12,10"
+                                                    Background="{DynamicResource PanelBrush}"
+                                                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+                                                    CornerRadius="12">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0" Width="36" Height="36" CornerRadius="12"
+                                                            Background="{DynamicResource BgBrush}" ClipToBounds="True"
+                                                            Margin="0,0,10,0" VerticalAlignment="Top">
+                                                        <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Author}" FontWeight="SemiBold"
+                                                                       FontSize="13"/>
+                                                            <TextBlock Text="{Binding TimeLabel}" FontSize="11"
+                                                                       Margin="10,2,0,0"
+                                                                       Foreground="{DynamicResource MutedBrush}"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding Text}" FontSize="13" Margin="0,4,0,0"
+                                                                   TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ChatInput" Grid.Column="0" Margin="0,0,8,0" MaxLength="500"
+                                     KeyDown="OnChatInputKeyDown"/>
+                            <Button Grid.Column="1" Content="Отправить" Style="{StaticResource PrimaryButton}"
+                                    Click="OnChatSendClick"/>
+                        </Grid>
                     </Grid>
 
                     <!-- НАСТРОЙКИ -->

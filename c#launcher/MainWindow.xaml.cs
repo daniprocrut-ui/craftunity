@@ -24,6 +24,9 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ModCard> _cards = new();
     private readonly ObservableCollection<InstalledCard> _installed = new();
     private readonly ObservableCollection<FileRow> _files = new();
+    private readonly ObservableCollection<ChatMessage> _chat = new();
+    private long _chatLastId;
+    private readonly System.Net.Http.HttpClient _chatHttp = new() { Timeout = TimeSpan.FromSeconds(12) };
     private string _kind = "mod";
     private string _installedFilter = "all";
     private int _offset;
@@ -61,6 +64,7 @@ public partial class MainWindow : Window
         ModResults.ItemsSource = _cards;
         InstalledList.ItemsSource = _installed;
         FileList.ItemsSource = _files;
+        ChatList.ItemsSource = _chat;
         BuildThemeTiles();
         Loaded += OnLoaded;
         Closed += OnClosed;
@@ -466,6 +470,7 @@ public partial class MainWindow : Window
             ("Файлы", "Свои файлы в папке игры"),
             ("Скин", "Ваш скин и его модель"),
             ("Аккаунт", "Оффлайн-ник или ely.by"),
+            ("Чат", "Общий чат участников лаунчера"),
             ("Настройки", "Вид, игра, каталоги, манифест"),
         };
         if (index >= 0 && index < titles.Length)
@@ -480,7 +485,8 @@ public partial class MainWindow : Window
         PageFiles.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
         PageSkin.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
         PageAccount.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
-        PageSettings.Visibility = index == 6 ? Visibility.Visible : Visibility.Collapsed;
+        PageChat.Visibility = index == 6 ? Visibility.Visible : Visibility.Collapsed;
+        PageSettings.Visibility = index == 7 ? Visibility.Visible : Visibility.Collapsed;
 
         switch (index)
         {
@@ -493,6 +499,9 @@ public partial class MainWindow : Window
             case 3:
                 _ = LoadFilesAsync();
                 break;
+            case 6:
+                _ = LoadChatAsync(true);
+                break;
         }
     }
 
@@ -500,6 +509,106 @@ public partial class MainWindow : Window
     {
         StatusText.Text = message;
         StatusText.Foreground = (Brush)FindResource(bad ? "DangerBrush" : "MutedBrush");
+    }
+
+    // ------------------------------------------------------------------ чат
+
+    private const string ChatBaseUrl = "https://craftunity-heartbeat.netlify.app";
+
+    private async void OnChatRefreshClick(object sender, RoutedEventArgs e) => await LoadChatAsync(true);
+
+    private async void OnChatSendClick(object sender, RoutedEventArgs e) => await SendChatAsync();
+
+    private async void OnChatInputKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) await SendChatAsync();
+    }
+
+    private async Task SendChatAsync()
+    {
+        var body = ChatInput.Text.Trim();
+        if (string.IsNullOrWhiteSpace(body)) return;
+        ChatState.Text = "Отправка…";
+        try
+        {
+            var payload = new
+            {
+                instance_id = _overview?.InstanceId ?? "",
+                username = _overview?.Account?.Username ?? "Гость",
+                text = body,
+            };
+            var json = JsonSerializer.Serialize(payload);
+            using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var response = await _chatHttp.PostAsync(ChatBaseUrl + "/message", content);
+            var answer = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                ChatState.Text = response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                    ? "Слишком часто, подождите пару секунд"
+                    : "Не удалось отправить: " + answer;
+                return;
+            }
+            ChatInput.Text = "";
+            ChatState.Text = "Отправлено";
+            await LoadChatAsync(false);
+        }
+        catch (Exception exc)
+        {
+            ChatState.Text = "Ошибка сети: " + exc.Message;
+        }
+    }
+
+    private async Task LoadChatAsync(bool reset)
+    {
+        try
+        {
+            var since = reset ? 0 : _chatLastId;
+            using var response = await _chatHttp.GetAsync($"{ChatBaseUrl}/messages?since={since}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ChatState.Text = "Приёмник недоступен: " + (int)response.StatusCode;
+                return;
+            }
+            var text = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            if (reset)
+            {
+                _chat.Clear();
+                _chatLastId = 0;
+            }
+            foreach (var item in root.Arr("messages"))
+            {
+                var id = (long)item.Num("id");
+                if (id <= _chatLastId && !reset) continue;
+                _chat.Add(new ChatMessage
+                {
+                    Id = id,
+                    Author = item.Str("username", "Гость"),
+                    Text = item.Str("text"),
+                    IconUrl = item.Str("icon"),
+                    TimeLabel = FormatChatTime(item.Num("at")),
+                });
+                if (id > _chatLastId) _chatLastId = id;
+            }
+            var count = (long)root.Num("count");
+            ChatState.Text = count == 0 ? "Сообщений пока нет" : $"Сообщений: {count}";
+            ChatScroll.ScrollToEnd();
+        }
+        catch (Exception exc)
+        {
+            ChatState.Text = "Ошибка сети: " + exc.Message;
+        }
+    }
+
+    private static string FormatChatTime(double seconds)
+    {
+        if (seconds <= 0) return "";
+        var moment = DateTimeOffset.FromUnixTimeSeconds((long)seconds).ToLocalTime();
+        var today = DateTimeOffset.Now.Date;
+        return moment.Date == today
+            ? moment.ToString("HH:mm")
+            : moment.ToString("dd.MM HH:mm");
     }
 
     // ------------------------------------------------------------------ игра

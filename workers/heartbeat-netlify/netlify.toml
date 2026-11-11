@@ -19,3 +19,13 @@
   from = "/manifest"
   to = "/.netlify/functions/heartbeat"
   status = 200
+
+[[redirects]]
+  from = "/message"
+  to = "/.netlify/functions/heartbeat"
+  status = 200
+
+[[redirects]]
+  from = "/messages"
+  to = "/.netlify/functions/heartbeat"
+  status = 200

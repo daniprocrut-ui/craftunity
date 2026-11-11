@@ -8,6 +8,12 @@ const MANIFEST_URL =
 
 const DROPBOX_TOKEN = process.env.DROPBOX_TOKEN || "";
 
+const CHAT_KEY = "chat.json";
+const CHAT_MAX = 500;
+const CHAT_TTL_SECONDS = 60 * 60 * 24 * 30;
+const CHAT_MAX_LEN = 500;
+const CHAT_MIN_GAP = 3;
+
 function json(status, payload) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -51,6 +57,21 @@ async function load() {
 
 async function save(payload) {
   await store().setJSON(KEY, payload);
+}
+
+function chatStore() {
+  return getStore({ name: "craftunity-chat", consistency: "strong" });
+}
+
+async function loadChat() {
+  const data = await chatStore().get(CHAT_KEY, { type: "json" });
+  const messages = data && Array.isArray(data.messages) ? data.messages : [];
+  const now = Math.floor(Date.now() / 1000);
+  return messages.filter((item) => now - Number(item.at || 0) < CHAT_TTL_SECONDS);
+}
+
+async function saveChat(messages) {
+  await chatStore().setJSON(CHAT_KEY, { messages: messages.slice(-CHAT_MAX) });
 }
 
 export default async (request) => {
@@ -154,6 +175,50 @@ export default async (request) => {
         count: items.length,
         storage: "blobs",
         updated_at: Math.floor(Date.now() / 1000),
+      });
+    }
+
+    if (method === "POST" && path.endsWith("/message")) {
+      let data;
+      try {
+        data = await request.json();
+      } catch {
+        return json(400, { error: "bad json" });
+      }
+      const instance = String(data.instance_id || "").trim().slice(0, 64);
+      const text = String(data.text || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, CHAT_MAX_LEN);
+      if (!instance || !text) {
+        return json(400, { error: "no instance_id or text" });
+      }
+      const now = Math.floor(Date.now() / 1000);
+      const messages = await loadChat();
+      const last = messages[messages.length - 1];
+      if (last && last.instance_id === instance && now - Number(last.at || 0) < CHAT_MIN_GAP) {
+        return json(429, { error: "too fast" });
+      }
+      const clients = await load();
+      const known = clients[instance] || {};
+      const message = {
+        id: (last ? Number(last.id || 0) : 0) + 1,
+        instance_id: instance,
+        username: String(data.username || known.username || "Гость").trim().slice(0, 32) || "Гость",
+        icon: String(data.icon || known.icon || "").slice(0, 256),
+        text,
+        at: now,
+      };
+      messages.push(message);
+      await saveChat(messages);
+      return json(200, { ok: true, message });
+    }
+
+    if (method === "GET" && path.endsWith("/messages")) {
+      const since = Number(url.searchParams.get("since") || 0) || 0;
+      const messages = await loadChat();
+      const fresh = since > 0 ? messages.filter((item) => Number(item.id || 0) > since) : messages;
+      return json(200, {
+        messages: fresh,
+        last_id: messages.length ? Number(messages[messages.length - 1].id || 0) : 0,
+        count: messages.length,
       });
     }
 
