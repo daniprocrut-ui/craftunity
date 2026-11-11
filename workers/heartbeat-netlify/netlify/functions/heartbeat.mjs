@@ -13,6 +13,7 @@ const CHAT_MAX = 500;
 const CHAT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const CHAT_MAX_LEN = 500;
 const CHAT_MIN_GAP = 3;
+const CHAT_REACTIONS = ["👍", "❤️", "🔥", "😄", "😢"];
 
 function json(status, payload) {
   return new Response(JSON.stringify(payload), {
@@ -205,10 +206,83 @@ export default async (request) => {
         icon: String(data.icon || known.icon || "").slice(0, 256),
         text,
         at: now,
+        edited_at: 0,
+        reactions: {},
       };
       messages.push(message);
       await saveChat(messages);
       return json(200, { ok: true, message });
+    }
+
+    if (method === "POST" && (path.endsWith("/message/edit") || path.endsWith("/message/delete"))) {
+      let data;
+      try {
+        data = await request.json();
+      } catch {
+        return json(400, { error: "bad json" });
+      }
+      const instance = String(data.instance_id || "").trim().slice(0, 64);
+      const id = Number(data.id || 0);
+      if (!instance || !id) {
+        return json(400, { error: "no instance_id or id" });
+      }
+      const messages = await loadChat();
+      const message = messages.find((item) => Number(item.id) === id);
+      if (!message) {
+        return json(404, { error: "no message" });
+      }
+      if (message.instance_id !== instance) {
+        return json(403, { error: "not your message" });
+      }
+      if (path.endsWith("/message/delete")) {
+        const rest = messages.filter((item) => Number(item.id) !== id);
+        await saveChat(rest);
+        return json(200, { ok: true, deleted: id });
+      }
+      const text = String(data.text || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, CHAT_MAX_LEN);
+      if (!text) {
+        return json(400, { error: "no text" });
+      }
+      message.text = text;
+      message.edited_at = Math.floor(Date.now() / 1000);
+      await saveChat(messages);
+      return json(200, { ok: true, message });
+    }
+
+    if (method === "POST" && path.endsWith("/message/react")) {
+      let data;
+      try {
+        data = await request.json();
+      } catch {
+        return json(400, { error: "bad json" });
+      }
+      const instance = String(data.instance_id || "").trim().slice(0, 64);
+      const id = Number(data.id || 0);
+      const emoji = String(data.emoji || "").trim();
+      if (!instance || !id || !CHAT_REACTIONS.includes(emoji)) {
+        return json(400, { error: "no instance_id, id or bad emoji" });
+      }
+      const messages = await loadChat();
+      const message = messages.find((item) => Number(item.id) === id);
+      if (!message) {
+        return json(404, { error: "no message" });
+      }
+      const reactions = message.reactions && typeof message.reactions === "object" ? message.reactions : {};
+      const voters = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
+      const at = voters.indexOf(instance);
+      if (at >= 0) {
+        voters.splice(at, 1);
+      } else {
+        voters.push(instance);
+      }
+      if (voters.length) {
+        reactions[emoji] = voters.slice(0, 500);
+      } else {
+        delete reactions[emoji];
+      }
+      message.reactions = reactions;
+      await saveChat(messages);
+      return json(200, { ok: true, id, reactions });
     }
 
     if (method === "GET" && path.endsWith("/messages")) {

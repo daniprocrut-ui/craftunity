@@ -541,9 +541,33 @@
                                                             <TextBlock Text="{Binding TimeLabel}" FontSize="11"
                                                                        Margin="10,2,0,0"
                                                                        Foreground="{DynamicResource MutedBrush}"/>
+                                                            <TextBlock Text="изменено" FontSize="10" Margin="8,3,0,0"
+                                                                       Foreground="{DynamicResource MutedBrush}"
+                                                                       Visibility="{Binding Edited, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Button Content="Изменить" Tag="{Binding}" Click="OnChatEditClick"
+                                                                    Margin="10,0,0,0" Padding="8,2" FontSize="10"
+                                                                    Visibility="{Binding Mine, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Button Content="Удалить" Tag="{Binding}" Click="OnChatDeleteClick"
+                                                                    Margin="6,0,0,0" Padding="8,2" FontSize="10"
+                                                                    Visibility="{Binding Mine, Converter={StaticResource BoolToVisibility}}"/>
                                                         </StackPanel>
                                                         <TextBlock Text="{Binding Text}" FontSize="13" Margin="0,4,0,0"
                                                                    TextWrapping="Wrap"/>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                            <Button Content="{Binding LikeLabel}" Tag="{Binding}" Click="OnChatReactClick"
+                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
+                                                            <Button Content="{Binding HeartLabel}" Tag="{Binding}" Click="OnChatReactClick"
+                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
+                                                            <Button Content="{Binding FireLabel}" Tag="{Binding}" Click="OnChatReactClick"
+                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
+                                                            <Button Content="{Binding SmileLabel}" Tag="{Binding}" Click="OnChatReactClick"
+                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
+                                                            <Button Content="{Binding SadLabel}" Tag="{Binding}" Click="OnChatReactClick"
+                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
+                                                            <TextBlock Text="{Binding ReactionsLabel}" FontSize="11"
+                                                                       VerticalAlignment="Center" Margin="6,0,0,0"
+                                                                       Foreground="{DynamicResource MutedBrush}"/>
+                                                        </StackPanel>
                                                     </StackPanel>
                                                 </Grid>
                                             </Border>

@@ -206,8 +206,17 @@ public static class Models
 public sealed class ChatMessage
 {
     public long Id { get; set; }
+    public string InstanceId { get; set; } = "";
     public string Author { get; set; } = "";
     public string Text { get; set; } = "";
     public string IconUrl { get; set; } = "";
     public string TimeLabel { get; set; } = "";
+    public bool Edited { get; set; }
+    public bool Mine { get; set; }
+    public string ReactionsLabel { get; set; } = "";
+    public string LikeLabel { get; set; } = "👍";
+    public string HeartLabel { get; set; } = "❤️";
+    public string FireLabel { get; set; } = "🔥";
+    public string SmileLabel { get; set; } = "😄";
+    public string SadLabel { get; set; } = "😢";
 }

@@ -563,6 +563,87 @@ public partial class MainWindow : Window
         }
     }
 
+    private long ChatId => _chat.Count > 0 ? _chat[^1].Id : 0;
+
+    private static string FormatReactions(JsonElement item)
+    {
+        if (!item.TryGetProperty("reactions", out var reactions) || reactions.ValueKind != JsonValueKind.Object)
+            return "";
+        var parts = new List<string>();
+        foreach (var entry in reactions.EnumerateObject())
+        {
+            if (entry.Value.ValueKind != JsonValueKind.Array) continue;
+            var count = entry.Value.GetArrayLength();
+            if (count > 0) parts.Add($"{entry.Name} {count}");
+        }
+        return string.Join("  ", parts);
+    }
+
+    private async void OnChatDeleteClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ChatMessage message }) return;
+        var answer = MessageBox.Show(this, "Удалить своё сообщение?", "Чат Craftunity",
+            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+        await PostChatAsync("/message/delete", new { id = message.Id });
+    }
+
+    private async void OnChatEditClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ChatMessage message }) return;
+        var dialog = new ChatEditWindow(message.Text) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        var body = dialog.MessageText.Trim();
+        if (string.IsNullOrWhiteSpace(body) || body == message.Text) return;
+        await PostChatAsync("/message/edit", new { id = message.Id, text = body });
+    }
+
+    private async void OnChatReactClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ChatMessage message, Content: string emoji }) return;
+        await PostChatAsync("/message/react", new { id = message.Id, emoji });
+    }
+
+    private async Task PostChatAsync(string path, object payload)
+    {
+        if (_overview is null) return;
+        try
+        {
+            var json = JsonSerializer.Serialize(new
+            {
+                instance_id = _overview.InstanceId,
+                id = GetProp<long>(payload, "id"),
+                text = GetProp<string>(payload, "text"),
+                emoji = GetProp<string>(payload, "emoji"),
+            });
+            using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var response = await _chatHttp.PostAsync(ChatBaseUrl + path, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var answer = await response.Content.ReadAsStringAsync();
+                ChatState.Text = response.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "Это не ваше сообщение"
+                    : "Ошибка: " + answer;
+                return;
+            }
+            ChatState.Text = "Готово";
+            await LoadChatAsync(true);
+        }
+        catch (Exception exc)
+        {
+            ChatState.Text = "Ошибка сети: " + exc.Message;
+        }
+    }
+
+    private static T GetProp<T>(object source, string name)
+    {
+        var prop = source.GetType().GetProperty(name);
+        if (prop is null) return default!;
+        var value = prop.GetValue(source);
+        if (value is null) return default!;
+        return value is T typed ? typed : default!;
+    }
+
     private async Task LoadChatAsync(bool reset)
     {
         try
@@ -586,13 +667,19 @@ public partial class MainWindow : Window
             {
                 var id = (long)item.Num("id");
                 if (id <= _chatLastId && !reset) continue;
+                var senderId = item.Str("instance_id");
                 _chat.Add(new ChatMessage
                 {
                     Id = id,
+                    InstanceId = senderId,
                     Author = item.Str("username", "Гость"),
                     Text = item.Str("text"),
                     IconUrl = item.Str("icon"),
                     TimeLabel = FormatChatTime(item.Num("at")),
+                    Edited = item.Num("edited_at") > 0,
+                    Mine = !string.IsNullOrEmpty(senderId)
+                           && senderId == (_overview?.InstanceId ?? ""),
+                    ReactionsLabel = FormatReactions(item),
                 });
                 if (id > _chatLastId) _chatLastId = id;
             }

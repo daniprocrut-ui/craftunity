@@ -29,3 +29,18 @@
   from = "/messages"
   to = "/.netlify/functions/heartbeat"
   status = 200
+
+[[redirects]]
+  from = "/message/edit"
+  to = "/.netlify/functions/heartbeat"
+  status = 200
+
+[[redirects]]
+  from = "/message/delete"
+  to = "/.netlify/functions/heartbeat"
+  status = 200
+
+[[redirects]]
+  from = "/message/react"
+  to = "/.netlify/functions/heartbeat"
+  status = 200
