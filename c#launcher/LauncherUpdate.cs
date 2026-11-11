@@ -82,6 +82,47 @@ public static class LauncherUpdate
         }
     }
 
+    /// <summary>
+    /// Запускает установщик через отдельный cmd, который сначала дожидается выхода лаунчера,
+    /// и только потом ставит обновление. Так установщик не конкурирует за python.exe.
+    /// </summary>
+    public static bool RunInstallerAfterExit(string installerPath, int exitTimeoutSeconds = 90)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Craftunity", "update");
+            Directory.CreateDirectory(dir);
+            var script = Path.Combine(dir, "apply_setup.cmd");
+            var body =
+                "@echo off\r\n" +
+                "chcp 65001 >nul\r\n" +
+                "setlocal\r\n" +
+                "set /a TRIES=0\r\n" +
+                ":wait\r\n" +
+                "tasklist /FI \"IMAGENAME eq CraftunityLauncher.exe\" | find /I \"CraftunityLauncher.exe\" >nul\r\n" +
+                "if errorlevel 1 goto run\r\n" +
+                "set /a TRIES+=1\r\n" +
+                $"if %TRIES% GEQ {exitTimeoutSeconds} goto run\r\n" +
+                "ping -n 2 127.0.0.1 >nul\r\n" +
+                "goto wait\r\n" +
+                ":run\r\n" +
+                $"start \"\" \"{installerPath}\" /SILENT /NOCANCEL /NORESTART /SP- /CLOSEAPPLICATIONS /NORESTARTAPPLICATIONS\r\n" +
+                "del \"%~f0\" >nul 2>&1\r\n";
+            File.WriteAllText(script, body, System.Text.Encoding.UTF8);
+            Process.Start(new ProcessStartInfo("cmd.exe")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                Arguments = $"/c \"{script}\"",
+            });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static int Compare(string left, string right)
     {
         static string[] Parts(string value) =>

@@ -154,7 +154,7 @@ public partial class MainWindow : Window
             return;
         }
         StatusText.Text = "Запуск установщика…";
-        if (LauncherUpdate.RunInstaller(installer))
+        if (LauncherUpdate.RunInstallerAfterExit(installer))
         {
             _pollCts?.Cancel();
             _api?.Dispose();

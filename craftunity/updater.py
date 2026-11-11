@@ -97,11 +97,43 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _replace_with_retry(source: Path, dest: Path, attempts: int = 12, delay: float = 0.5) -> None:
+    """os.replace, который переживает короткую занятость файла (антивирус, второй процесс)."""
+    last: OSError | None = None
+    for attempt in range(max(1, attempts)):
+        try:
+            os.replace(source, dest)
+            return
+        except OSError as exc:
+            last = exc
+            if attempt + 1 < attempts:
+                time.sleep(delay)
+    if last is not None:
+        raise last
+
+
+def _clear_stale_parts(target: Path) -> None:
+    """Убирает недокачанные .part прошлых запусков, иначе они блокируют новую загрузку."""
+    part = target.with_name(target.name + ".part")
+    if not part.exists():
+        return
+    try:
+        with part.open("ab"):
+            pass
+    except OSError:
+        return
+    try:
+        part.unlink()
+    except OSError:
+        pass
+
+
 def download(url: str, dest: Path, timeout: int = 120) -> Path:
     from .util import LauncherError, ssl_context
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
+    _clear_stale_parts(dest)
     request = urllib.request.Request(url)
     request.add_header("User-Agent", f"CraftunityLauncher/{config.LAUNCHER_VERSION}")
     try:
@@ -127,7 +159,12 @@ def download(url: str, dest: Path, timeout: int = 120) -> Path:
         part.unlink(missing_ok=True)
         raise LauncherError(f"Файл обновления недоступен ({url}): {exc.reason}") from exc
     except OSError as exc:
-        part.unlink(missing_ok=True)
+        try:
+            with part.open("ab"):
+                pass
+            part.unlink()
+        except OSError:
+            pass
         raise LauncherError(f"Не удалось сохранить обновление: {exc}") from exc
     return dest
 

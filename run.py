@@ -114,6 +114,30 @@ def wait_for_previous(timeout: float = 8.0) -> None:
         return
 
 
+def apply_update_in_process() -> bool:
+    """Подменяет скачанный exe без перезапуска сервера — для запуска из C#-лаунчера.
+
+    C#-окно держит python.exe живым всё время, поэтому старый путь (schedule_apply)
+    не подходит: скрипт подмены не сможет заменить занятый файл. Здесь замена идёт
+    в самом процессе, а C# перезапустит окно после закрытия.
+    """
+    if not updater.is_frozen():
+        return False
+    info = updater.pending_info()
+    if not info:
+        updater.discard_pending()
+        return False
+    try:
+        exe = Path(sys.executable).resolve()
+        updater._swap_files(exe, updater.pending_exe_path())
+    except OSError as exc:
+        updater._log_update(f"Не удалось подменить exe: {exc}")
+        return False
+    updater.pending_meta_path().unlink(missing_ok=True)
+    updater.mark_applied(str(info.get("version") or ""))
+    return True
+
+
 def maybe_apply_update() -> None:
     current = server.ENGINE.manifest
     if not current or updater.just_applied():
@@ -125,6 +149,10 @@ def maybe_apply_update() -> None:
     if process is not None and process.poll() is None:
         return
     if getattr(server.ENGINE, "status", "") in ("installing", "launching"):
+        return
+    if os.environ.get("CRAFTUNITY_HEADLESS") == "1":
+        if apply_update_in_process():
+            server.ENGINE.request_restart = True
         return
     if updater.schedule_apply():
         clear_lock()
@@ -244,6 +272,73 @@ def show_problem(title: str, text: str) -> None:
         print(text, file=sys.stderr)
 
 
+def browser_profile_dir() -> Path:
+    folder = config.data_dir() / "window"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return folder
+
+
+def launchable_browser(url: str) -> bool:
+    """Окно браузера без вкладок и адресной строки, со своим профилем."""
+    if os.name != "nt":
+        return False
+    profile = "--user-data-dir=" + str(browser_profile_dir())
+    args = ["--app=" + url, profile, "--no-first-run", "--no-default-browser-check"]
+    candidates: list[str] = []
+    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
+        if not base:
+            continue
+        candidates += [
+            os.path.join(base, r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(base, r"Microsoft\Edge\Application\msedge.exe"),
+            os.path.join(base, r"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            os.path.join(base, r"Vivaldi\Application\vivaldi.exe"),
+            os.path.join(base, r"Yandex\YandexBrowser\Application\browser.exe"),
+        ]
+    local = os.environ.get("LOCALAPPDATA") or ""
+    if local:
+        candidates += [
+            os.path.join(local, r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(local, r"Microsoft\Edge\Application\msedge.exe"),
+            os.path.join(local, r"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            os.path.join(local, r"Yandex\YandexBrowser\Application\browser.exe"),
+            os.path.join(local, r"Programs\Opera GX\opera.exe"),
+            os.path.join(local, r"Programs\Opera\opera.exe"),
+        ]
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            import subprocess
+
+            subprocess.Popen(
+                [path, *args],
+                close_fds=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            return True
+        except OSError:
+            continue
+    return False
+
+def _com_init() -> None:
+    """pywebview требует инициализированный COM в текущем потоке (иначе CO_E_NOTINITIALIZED)."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.ole32.CoInitialize(None)
+    except Exception:
+        pass
+
+
 def run_window(url: str) -> bool:
     if not webview2_available():
         return False
@@ -251,6 +346,7 @@ def run_window(url: str) -> bool:
         import webview  # type: ignore
     except Exception:
         return False
+    _com_init()
     try:
         window = webview.create_window(
             "Craftunity Launcher",
@@ -274,9 +370,22 @@ def main() -> int:
     parser.add_argument("--browser", action="store_true", help="Открыть в браузере вместо окна")
     parser.add_argument("--prepare-keys", action="store_true", help="Создать ключи подписи и выйти")
     parser.add_argument("--updated", action="store_true", help="Служебный флаг: лаунчер перезапущен после обновления")
+    parser.add_argument("--uninstall-cleanup", action="store_true", help="Служебный флаг деинсталлятора: убрать временные файлы и остановить сервер")
     args = parser.parse_args()
 
     config.seed_from_portable()
+
+    if getattr(args, "uninstall_cleanup", False):
+        try:
+            import shutil as _shutil
+            from pathlib import Path as _Path
+            for _name in ("updates", "admin"):
+                _shutil.rmtree(config.data_dir() / _name, ignore_errors=True)
+            (config.data_dir() / "launcher.lock").unlink(missing_ok=True)
+        except Exception:
+            pass
+        return 0
+
 
     if not args.prepare_keys and getattr(sys, "frozen", False):
         trouble = temp_problem()
@@ -307,6 +416,8 @@ def main() -> int:
         print(f"Публичный манифест: http://127.0.0.1:{port}/api/manifest.json")
         if not args.browser:
             if run_window(url):
+                return 0
+            if launchable_browser(url):
                 return 0
         webbrowser.open(url)
         try:
@@ -374,9 +485,13 @@ def main() -> int:
             print(url)
             while True:
                 time.sleep(1)
-        if not args.browser and run_window(url):
-            return 0
-        webbrowser.open(url)
+        if not args.browser:
+            if run_window(url):
+                return 0
+            if launchable_browser(url):
+                while True:
+                    time.sleep(1)
+            webbrowser.open(url)
         while True:
             time.sleep(1)
     except KeyboardInterrupt:

@@ -58,15 +58,16 @@ Type: filesandordirs; Name: "{app}\keys"
 Type: files; Name: "{app}\run.py"
 
 [Code]
-{ Перед установкой закрываем запущенные процессы лаунчера и Python. }
-function InitializeSetup(): Boolean;
+{ Закрываем запущенные процессы лаунчера и Python уже на этапе установки файлов.
+  В InitializeSetup этого делать нельзя: окно ещё не появилось, а taskkill висит. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
   Exec('taskkill.exe', '/F /IM CraftunityLauncher.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/F /IM python.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(600);
-  Result := True;
+  Sleep(800);
+  Result := '';
 end;
 
 { Убираем мёртвый lock-файл, чтобы новый лаунчер сразу запустился. }
