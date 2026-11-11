@@ -127,9 +127,14 @@ def apply_update_in_process() -> bool:
     if not info:
         updater.discard_pending()
         return False
+    if updater.is_installer_url(str(info.get("url") or "")):
+        if not updater.run_installer(updater.pending_exe_path(info)):
+            return False
+        updater.pending_meta_path().unlink(missing_ok=True)
+        return True
     try:
         exe = Path(sys.executable).resolve()
-        updater._swap_files(exe, updater.pending_exe_path())
+        updater._swap_files(exe, updater.pending_exe_path(info))
     except OSError as exc:
         updater._log_update(f"Не удалось подменить exe: {exc}")
         return False

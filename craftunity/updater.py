@@ -24,8 +24,26 @@ def update_dir() -> Path:
     return path
 
 
-def pending_exe_path() -> Path:
-    return update_dir() / (Path(executable_name()).stem + ".exe" + PENDING_SUFFIX)
+INSTALLER_PENDING = "Craftunity_Setup_pending.exe"
+
+
+def is_installer_url(url: str) -> bool:
+    name = str(url or "").split("?")[0].rsplit("/", 1)[-1].lower()
+    return name.startswith("craftunity_setup") and name.endswith(".exe")
+
+
+def pending_name(block: dict | None = None) -> str:
+    if block is None:
+        block = config.load_json(pending_meta_path())
+        if not isinstance(block, dict):
+            block = {}
+    if is_installer_url(str(block.get("url") or "")):
+        return INSTALLER_PENDING
+    return Path(executable_name()).stem + ".exe" + PENDING_SUFFIX
+
+
+def pending_exe_path(block: dict | None = None) -> Path:
+    return update_dir() / pending_name(block)
 
 
 def pending_meta_path() -> Path:
@@ -192,7 +210,7 @@ def stage(block: dict, timeout: int = 120) -> Path:
     expected = str(block.get("sha256") or "").strip().lower()
     if not url or not version:
         raise LauncherError("В манифесте нет данных об обновлении лаунчера.")
-    target = pending_exe_path()
+    target = pending_exe_path(block)
     last_error: Exception | None = None
     for candidate in _candidates(block, url):
         try:
@@ -224,7 +242,9 @@ def stage(block: dict, timeout: int = 120) -> Path:
 def pending_info() -> dict | None:
     """Возвращает данные о готовом к установке обновлении, если файл цел."""
     meta = config.load_json(pending_meta_path())
-    target = pending_exe_path()
+    if not isinstance(meta, dict):
+        return None
+    target = pending_exe_path(meta)
     if not target.exists() or not meta.get("version"):
         return None
     if meta.get("sha256") and _sha256(target) != str(meta["sha256"]).lower():
@@ -349,6 +369,24 @@ def _swap_files(exe: Path, fresh: Path) -> None:
         raise
 
 
+def run_installer(path: Path) -> bool:
+    """Запускает скачанный установщик отдельным процессом."""
+    try:
+        subprocess.Popen(
+            [str(path), "/SILENT", "/NOCANCEL", "/NORESTART", "/SP-", "/CLOSEAPPLICATIONS", "/NORESTARTAPPLICATIONS"],
+            cwd=str(path.parent),
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        _log_update(f"Не удалось запустить установщик: {exc}")
+        return False
+    _log_update(f"Запущен установщик {path.name}")
+    return True
+
+
 def apply_pending(relaunch_args: list[str] | None = None) -> bool:
     """Подменяет текущий exe на скачанный и перезапускает лаунчер. True — нужно выйти."""
     if not is_frozen():
@@ -357,8 +395,14 @@ def apply_pending(relaunch_args: list[str] | None = None) -> bool:
     if not info:
         discard_pending()
         return False
+    if is_installer_url(str(info.get("url") or "")):
+        path = pending_exe_path(info)
+        if not run_installer(path):
+            return False
+        pending_meta_path().unlink(missing_ok=True)
+        return True
     exe = Path(sys.executable).resolve()
-    fresh = pending_exe_path()
+    fresh = pending_exe_path(info)
     try:
         _swap_files(exe, fresh)
     except OSError as exc:
@@ -428,8 +472,10 @@ def schedule_apply() -> bool:
     if not info:
         discard_pending()
         return False
+    if is_installer_url(str(info.get("url") or "")):
+        return run_installer(pending_exe_path(info))
     exe = Path(sys.executable).resolve()
-    fresh = pending_exe_path()
+    fresh = pending_exe_path(info)
     old = update_dir() / (exe.name + ".old")
     try:
         old.unlink(missing_ok=True)
