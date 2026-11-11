@@ -212,6 +212,7 @@ def stage(block: dict, timeout: int = 120) -> Path:
         raise LauncherError("В манифесте нет данных об обновлении лаунчера.")
     target = pending_exe_path(block)
     last_error: Exception | None = None
+    staged = False
     for candidate in _candidates(block, url):
         try:
             download(candidate, target, timeout=timeout)
@@ -223,9 +224,10 @@ def stage(block: dict, timeout: int = 120) -> Path:
             target.unlink(missing_ok=True)
             last_error = LauncherError("Контрольная сумма обновления не совпала — файл удалён.")
             continue
+        staged = True
         break
-    if last_error is not None:
-        raise last_error
+    if not staged:
+        raise last_error if last_error is not None else LauncherError("Обновление не скачалось.")
     actual = _sha256(target)
     meta = {
         "version": version,
@@ -369,8 +371,68 @@ def _swap_files(exe: Path, fresh: Path) -> None:
         raise
 
 
-def run_installer(path: Path) -> bool:
+LAUNCHER_EXE = "CraftunityLauncher.exe"
+
+
+def stop_launcher_process(attempts: int = 20, delay: float = 0.3) -> bool:
+    """Просит C#-окно закрыться и ждёт.
+
+    Установщик в PrepareToInstall делает taskkill по имени python.exe, а этот процесс
+    как раз и запускает установщик: если окно не закрыть заранее, установщик убьёт
+    собственного родителя и не доставит файлы.
+    """
+    if os.name != "nt":
+        return True
+    import urllib.request
+
+    lock = config.data_dir() / "launcher.lock"
+    port = 0
+    try:
+        import json as _json
+
+        port = int(_json.loads(lock.read_text(encoding="utf-8")).get("port") or 0)
+    except (OSError, ValueError, TypeError):
+        port = 0
+    if port:
+        try:
+            request = urllib.request.Request(f"http://127.0.0.1:{port}/api/shutdown", method="POST")
+            urllib.request.urlopen(request, timeout=3).close()
+        except Exception:
+            pass
+    for attempt in range(max(1, attempts)):
+        alive = False
+        try:
+            out = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {LAUNCHER_EXE}", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            ).stdout
+            alive = LAUNCHER_EXE.lower() in (out or "").lower()
+        except (OSError, subprocess.SubprocessError):
+            alive = False
+        if not alive:
+            return True
+        if attempt == attempts - 1:
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", LAUNCHER_EXE],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except (OSError, subprocess.SubprocessError):
+                pass
+            if delay:
+                time.sleep(delay)
+        elif delay:
+            time.sleep(delay)
+    return False
+
+
+def run_installer(path: Path, wait_launcher: bool = True) -> bool:
     """Запускает скачанный установщик отдельным процессом."""
+    if wait_launcher:
+        stop_launcher_process()
     try:
         subprocess.Popen(
             [str(path), "/SILENT", "/NOCANCEL", "/NORESTART", "/SP-", "/CLOSEAPPLICATIONS", "/NORESTARTAPPLICATIONS"],

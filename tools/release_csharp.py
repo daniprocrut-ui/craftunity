@@ -110,10 +110,23 @@ def build_setup(version: str) -> Path:
 
 
 def stage_setup(version: str, setup: Path) -> str:
+    """Кладёт установщик в docs/launcher/<версия>/ и проверяет, что он реально на месте.
+
+    Возвращает пустую строку, если копия не создалась: зеркало с битым адресом ломает
+    обновление сильнее, чем его отсутствие.
+    """
     target_dir = PAGES_DIR / version
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / setup.name
-    shutil.copy2(setup, target)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / setup.name
+        shutil.copy2(setup, target)
+        if not target.exists() or target.stat().st_size != setup.stat().st_size:
+            print("!! копия установщика для зеркала не создалась — зеркало не публикую")
+            shutil.rmtree(target_dir, ignore_errors=True)
+            return ""
+    except OSError as exc:
+        print(f"!! не удалось подготовить зеркало: {exc}")
+        return ""
     print(f"-> docs/launcher/{version}/{setup.name}")
     for item in PAGES_DIR.iterdir():
         if item.is_dir() and item.name != version:
