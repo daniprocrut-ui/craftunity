@@ -26,6 +26,10 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<FileRow> _files = new();
     private readonly ObservableCollection<ChatMessage> _chat = new();
     private long _chatLastId;
+    private int _chatUnread;
+    private int _chatTick;
+    private readonly List<ChatMessage> _pendingChat = new();
+    private System.Windows.Threading.DispatcherTimer? _chatToastTimer;
     private readonly System.Net.Http.HttpClient _chatHttp = new() { Timeout = TimeSpan.FromSeconds(12) };
     private string _kind = "mod";
     private string _installedFilter = "all";
@@ -262,6 +266,18 @@ public partial class MainWindow : Window
                 catch
                 {
                     // пропускаем тик
+                }
+                _chatTick++;
+                if (_chatTick % 10 == 0 && _overview is not null)
+                {
+                    try
+                    {
+                        await PollChatAsync();
+                    }
+                    catch
+                    {
+                        // чат не критичен для работы лаунчера
+                    }
                 }
             }
         }, token);
@@ -505,6 +521,7 @@ public partial class MainWindow : Window
                 _ = LoadFilesAsync();
                 break;
             case 6:
+                ClearChatUnread();
                 _ = LoadChatAsync(true);
                 break;
         }
@@ -644,6 +661,88 @@ public partial class MainWindow : Window
         return value is T typed ? typed : default!;
     }
 
+    private void TrackUnread(ChatMessage message)
+    {
+        if (message.Mine) return;
+        if (Nav.SelectedIndex == 6 && IsActive) return;
+        _chatUnread++;
+        ChatBadgeText.Text = _chatUnread > 99 ? "99+" : _chatUnread.ToString();
+        ChatBadge.Visibility = Visibility.Visible;
+        ShowChatToast(message);
+    }
+
+    private void ClearChatUnread()
+    {
+        _chatUnread = 0;
+        ChatBadge.Visibility = Visibility.Collapsed;
+        ChatToast.Visibility = Visibility.Collapsed;
+        _chatToastTimer?.Stop();
+    }
+
+    private void ShowChatToast(ChatMessage message)
+    {
+        ChatToastIcon.Source = LoadImage(message.IconUrl);
+        ChatToastTitle.Text = string.IsNullOrWhiteSpace(message.Author) ? "Новое сообщение" : message.Author;
+        ChatToastText.Text = message.Text;
+        ChatToast.Visibility = Visibility.Visible;
+
+        _chatToastTimer ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(6),
+        };
+        _chatToastTimer.Stop();
+        _chatToastTimer.Tick -= HideChatToast;
+        _chatToastTimer.Tick += HideChatToast;
+        _chatToastTimer.Start();
+    }
+
+    private void HideChatToast(object? sender, EventArgs e)
+    {
+        _chatToastTimer?.Stop();
+        ChatToast.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnChatToastClick(object sender, MouseButtonEventArgs e)
+    {
+        ChatToast.Visibility = Visibility.Collapsed;
+        Nav.SelectedIndex = 6;
+    }
+
+    private async Task PollChatAsync()
+    {
+        if (_overview is null) return;
+        try
+        {
+            using var response = await _chatHttp.GetAsync($"{ChatBaseUrl}/messages?since={_chatLastId}");
+            if (!response.IsSuccessStatusCode) return;
+            var text = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(text);
+            var mine = _overview?.InstanceId ?? "";
+            foreach (var item in doc.RootElement.Arr("messages"))
+            {
+                var id = (long)item.Num("id");
+                if (id <= _chatLastId) continue;
+                _chatLastId = id;
+                var senderId = item.Str("instance_id");
+                if (!string.IsNullOrEmpty(senderId) && senderId == mine) continue;
+                if (Nav.SelectedIndex == 6 && IsActive) continue;
+                TrackUnread(new ChatMessage
+                {
+                    Id = id,
+                    InstanceId = senderId,
+                    Author = item.Str("username", "Гость"),
+                    Text = item.Str("text"),
+                    IconUrl = item.Str("icon"),
+                    TimeLabel = FormatChatTime(item.Num("at")),
+                });
+            }
+        }
+        catch
+        {
+            // тик пропускаем
+        }
+    }
+
     private async Task LoadChatAsync(bool reset)
     {
         try
@@ -668,7 +767,7 @@ public partial class MainWindow : Window
                 var id = (long)item.Num("id");
                 if (id <= _chatLastId && !reset) continue;
                 var senderId = item.Str("instance_id");
-                _chat.Add(new ChatMessage
+                var newMessage = new ChatMessage
                 {
                     Id = id,
                     InstanceId = senderId,
@@ -680,8 +779,10 @@ public partial class MainWindow : Window
                     Mine = !string.IsNullOrEmpty(senderId)
                            && senderId == (_overview?.InstanceId ?? ""),
                     ReactionsLabel = FormatReactions(item),
-                });
+                };
+                _chat.Add(newMessage);
                 if (id > _chatLastId) _chatLastId = id;
+                if (!reset) TrackUnread(newMessage);
             }
             var count = (long)root.Num("count");
             ChatState.Text = count == 0 ? "Сообщений пока нет" : $"Сообщений: {count}";
