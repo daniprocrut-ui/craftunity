@@ -6,13 +6,13 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Craftunity"
-LAUNCHER_VERSION = "1.5.35"
+LAUNCHER_VERSION = "1.5.36"
 
 GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"
 DEFAULT_MANIFEST_SIG_URL = "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json.sig"
 MANIFEST_REFRESH_SECONDS = 60
-HEARTBEAT_URL = "https://craftunity-heartbeat.netlify.app"
+HEARTBEAT_URL = "https://craftunity-heartbeat.daniprocrut-ui.workers.dev"
 LEGACY_MANIFEST_URLS = (
     "https://craftunity.mcsh.io/launcher/manifest.json",
     "https://daniprocrut-ui.github.io/craftunity/manifest.json",
@@ -106,6 +106,7 @@ def settings_defaults() -> dict:
         "accept_manifest": True,
         "curseforge_key": "",
         "holiday_theme": True,
+        "chat_sound": True,
     }
 
 
