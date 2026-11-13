@@ -3,171 +3,243 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#08090c">
+<meta name="description" content="Craftunity — собственный лаунчер для сервера craftunity3.mcsh.io. Один файл, без установки.">
 <title>Craftunity — скачать лаунчер</title>
 <style>
   :root {
-    --bg: #0b0d12;
-    --bg-soft: #10131b;
-    --card: #161a24;
-    --card-2: #1c222f;
-    --line: #2a3350;
-    --text: #e9eefb;
-    --text-soft: #cdd6ea;
-    --muted: #8b95b2;
-    --accent: #fb923c;
-    --accent-hover: #fdab5f;
-    --accent-fg: #201206;
-    --warning: #fbbf24;
+    --bg: #08090c;
+    --bg-glow: #131a2e;
+    --card: rgba(255, 255, 255, 0.035);
+    --card-solid: #11141b;
+    --line: rgba(255, 255, 255, 0.085);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #f2f5fb;
+    --text-soft: #c3cbdb;
+    --muted: #838da3;
+    --accent: #ff8a3d;
+    --accent-soft: rgba(255, 138, 61, 0.14);
+    --accent-fg: #1a0f05;
+    --warning: #fbc64a;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
   }
 
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
-  html, body {
-    margin: 0;
-    padding: 0;
-  }
+  html { scroll-behavior: smooth; }
+
+  html, body { margin: 0; padding: 0; }
 
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 16px;
-    line-height: 1.6;
+    line-height: 1.65;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -20% -10% auto -10%;
+    height: 720px;
+    background:
+      radial-gradient(60% 60% at 50% 0%, rgba(255, 138, 61, 0.16), transparent 70%),
+      radial-gradient(50% 50% at 15% 10%, rgba(72, 108, 255, 0.16), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
   }
 
   .wrap {
-    max-width: 720px;
+    position: relative;
+    z-index: 1;
+    max-width: 880px;
     margin: 0 auto;
-    padding: 56px 24px 64px;
+    padding: 28px 24px 72px;
   }
 
-  header {
-    margin-bottom: 40px;
+  /* ---------- top bar ---------- */
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(17, 20, 27, 0.72);
+    backdrop-filter: blur(12px);
   }
 
   .brand {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--muted);
-    font-size: 14px;
-    text-transform: uppercase;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    font-size: 15px;
+    color: var(--text);
   }
 
-  .brand::before {
-    content: "";
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    background: var(--accent);
+  .brand-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: linear-gradient(145deg, var(--accent), #ff5f2e);
+    box-shadow: 0 6px 18px rgba(255, 106, 46, 0.35);
     flex: none;
+    display: grid;
+    place-items: center;
+  }
+
+  .brand-mark::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .topbar-nav {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .topbar-nav a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 7px 12px;
+    border-radius: 9px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .topbar-nav a:hover,
+  .topbar-nav a:focus-visible {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    padding: 64px 0 40px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px 6px 10px;
+  }
+
+  .eyebrow .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.14);
   }
 
   h1 {
-    margin: 18px 0 12px;
-    font-size: clamp(32px, 6vw, 46px);
-    line-height: 1.1;
+    margin: 22px 0 18px;
+    font-size: clamp(36px, 7vw, 62px);
+    line-height: 1.03;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.035em;
   }
+
+  h1 .accent { color: var(--accent); }
 
   .lead {
     margin: 0;
-    color: var(--muted);
-    font-size: 17px;
-    max-width: 560px;
+    max-width: 34em;
+    color: var(--text-soft);
+    font-size: clamp(16px, 2.2vw, 18px);
   }
+
+  /* ---------- cards ---------- */
 
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 22px;
-    margin-bottom: 18px;
+    border-radius: 20px;
+    padding: 26px;
+    margin-bottom: 16px;
+  }
+
+  .card.primary {
+    background:
+      linear-gradient(180deg, rgba(255, 138, 61, 0.07), rgba(255, 138, 61, 0) 60%),
+      var(--card-solid);
+    border-color: var(--line-strong);
+    padding: 28px;
   }
 
   .card h2 {
-    margin: 0 0 6px;
-    font-size: 15px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    margin: 0 0 4px;
+    font-size: 21px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+
+  .card p.sub {
+    margin: 0 0 20px;
     color: var(--muted);
+    font-size: 15px;
   }
 
-  .dl-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    margin-top: 18px;
-  }
-
-  .btn {
-    display: inline-block;
-    background: var(--accent);
-    color: var(--accent-fg);
-    font-weight: 600;
+  .card h3 {
+    margin: 24px 0 8px;
     font-size: 16px;
-    border: none;
-    border-radius: 12px;
-    padding: 14px 26px;
-    text-decoration: none;
-    cursor: pointer;
-    text-align: center;
-    transition: background-color 0.15s ease;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
-  .btn:hover {
-    background: var(--accent-hover);
-  }
+  .card h3:first-of-type { margin-top: 16px; }
 
-  .btn.secondary {
-    background: transparent;
-    color: var(--text-soft);
-    border: 1px solid var(--line);
-  }
-
-  .btn.secondary:hover {
-    border-color: var(--muted);
-    background: var(--card-2);
-  }
-
-  .hidden {
-    display: none;
-  }
-
-  .badge {
-    display: inline-block;
-    font-size: 13px;
-    color: var(--warning);
-    border: 1px solid currentColor;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-weight: 500;
-  }
+  /* ---------- meta grid ---------- */
 
   dl.info {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 8px 20px;
-    margin: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 4px;
+  }
+
+  dl.info > div {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 12px 14px;
+    min-width: 0;
   }
 
   dl.info dt {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--muted);
-    white-space: nowrap;
+    margin-bottom: 3px;
   }
 
   dl.info dd {
     margin: 0;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
     word-break: break-word;
+    font-variant-numeric: tabular-nums;
   }
 
   dl.info dd .dim {
@@ -175,59 +247,149 @@
     font-weight: 400;
   }
 
-  .notes {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
-    white-space: pre-line;
-    color: var(--text-soft);
-  }
-
   dl.info dd.sha {
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-    font-size: 0.82rem;
+    font-family: var(--mono);
+    font-size: 12px;
     font-weight: 400;
     color: var(--text-soft);
-    letter-spacing: 0.02em;
   }
 
-  #smartscreen h3 {
-    margin: 18px 0 8px;
-    font-size: 1rem;
+  /* ---------- buttons ---------- */
+
+  .dl-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 20px;
   }
 
-  .smartscreen-lead {
-    margin: 0 0 10px;
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 50px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font: inherit;
+    font-weight: 650;
+    font-size: 16px;
+    border: 1px solid transparent;
+    border-radius: 13px;
+    padding: 13px 26px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    box-shadow: 0 10px 26px rgba(255, 122, 50, 0.24);
+  }
+
+  .btn:hover { background: #ff9d5c; box-shadow: 0 12px 30px rgba(255, 122, 50, 0.32); }
+
+  .btn:active { transform: scale(0.975); }
+
+  .btn:focus-visible {
+    outline: 2px solid #ffd0a8;
+    outline-offset: 3px;
+  }
+
+  .btn svg { flex: none; }
+
+  .btn.secondary {
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--text);
+    border-color: var(--line-strong);
+    box-shadow: none;
+  }
+
+  .btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.085);
+    border-color: var(--muted);
+    box-shadow: none;
+  }
+
+  .hidden { display: none; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--warning);
+    background: rgba(251, 198, 74, 0.1);
+    border: 1px solid rgba(251, 198, 74, 0.32);
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+
+  .badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ---------- notes / steps ---------- */
+
+  .notes {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--line);
+    white-space: pre-line;
     color: var(--text-soft);
-  }
-
-  .smartscreen-lead code {
-    padding: 1px 6px;
-    border-radius: 6px;
-    background: var(--bg-alt, rgba(127, 127, 127, 0.14));
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-    font-size: 0.85rem;
+    font-size: 15px;
   }
 
   .notes:empty,
-  .notes.hidden {
-    display: none;
+  .notes.hidden { display: none; }
+
+  .card p { color: var(--text-soft); }
+
+  .card p code,
+  .card li code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    font-family: var(--mono);
+    font-size: 0.86em;
   }
 
   ol.steps {
-    margin: 0;
-    padding-left: 22px;
+    margin: 8px 0 0;
+    padding: 0 0 0 4px;
+    list-style: none;
+    counter-reset: step;
   }
 
   ol.steps li {
-    margin-bottom: 8px;
+    position: relative;
+    counter-increment: step;
+    padding-left: 36px;
+    margin-bottom: 10px;
     color: var(--text-soft);
   }
 
-  ol.steps li::marker {
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 12.5px;
+    font-weight: 650;
     color: var(--accent);
-    font-weight: 600;
+    background: var(--accent-soft);
   }
+
+  /* ---------- server ---------- */
 
   .server {
     display: flex;
@@ -235,86 +397,108 @@
     gap: 10px;
     justify-content: space-between;
     flex-wrap: wrap;
+    margin-top: 16px;
   }
 
   .server code {
-    font-family: "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    font-family: var(--mono);
     font-size: 15px;
     color: var(--text);
-    background: var(--card-2);
+    background: rgba(0, 0, 0, 0.35);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 11px;
+    padding: 12px 14px;
     user-select: all;
+    flex: 1 1 240px;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .copied {
     color: var(--accent);
     font-size: 13px;
-    margin-top: 10px;
-    min-height: 1.2em;
+    min-height: 1.35em;
+    margin-top: 8px;
   }
 
   footer {
-    margin-top: 44px;
+    margin-top: 48px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
     color: var(--muted);
     font-size: 13px;
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 
-  @media (max-width: 480px) {
-    .wrap { padding: 32px 16px 48px; }
-    .card { padding: 18px; }
+  /* ---------- responsive ---------- */
+
+  @media (max-width: 640px) {
+    .wrap { padding: 16px 16px 56px; }
+    .topbar { padding: 12px 14px; }
+    .topbar-nav { display: none; }
+    .hero { padding: 40px 0 28px; }
+    .card, .card.primary { padding: 20px; border-radius: 16px; }
+    dl.info { grid-template-columns: 1fr; }
     .dl-actions .btn { flex: 1 1 100%; }
+    footer { flex-direction: column; gap: 4px; }
   }
 
-  @media (max-width: 360px) {
-    dl.info { grid-template-columns: 1fr; gap: 2px; }
-    dl.info dt { white-space: normal; }
-    dl.info dd { margin-bottom: 8px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .btn { transition: none; }
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <div class="brand">Craftunity</div>
-      <h1>Клиент Craftunity</h1>
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Craftunity</div>
+      <nav class="topbar-nav" aria-label="Разделы страницы">
+        <a href="#download">Скачать</a>
+        <a href="#help">Помощь</a>
+        <a href="#howto">Как играть</a>
+        <a href="#server">Сервер</a>
+      </nav>
+    </div>
+
+    <header class="hero">
+      <div class="eyebrow"><span class="dot" aria-hidden="true"></span>Сервер работает · craftunity3.mcsh.io</div>
+      <h1>Клиент <span class="accent">Craftunity</span></h1>
       <p class="lead">Собственный лаунчер для сервера craftunity3.mcsh.io. Один файл без установки: скачал и запустил.</p>
     </header>
 
-    <section class="card">
+    <section class="card primary" id="download">
       <h2>Скачать лаунчер</h2>
+      <p class="sub">Актуальная версия и сборка подтягиваются автоматически.</p>
       <dl class="info">
-        <dt>Версия лаунчера</dt>
-        <dd id="launcher-version">&mdash;</dd>
-        <dt>Версия сборки</dt>
-        <dd id="build-version">&mdash;</dd>
-        <dt>Майнкрафт</dt>
-        <dd id="minecraft-version">&mdash;</dd>
-        <dt>Обновлено</dt>
-        <dd id="updated-at">&mdash;</dd>
+        <div><dt>Версия лаунчера</dt><dd id="launcher-version">&mdash;</dd></div>
+        <div><dt>Версия сборки</dt><dd id="build-version">&mdash;</dd></div>
+        <div><dt>Майнкрафт</dt><dd id="minecraft-version">&mdash;</dd></div>
+        <div><dt>Обновлено</dt><dd id="updated-at">&mdash;</dd></div>
       </dl>
-      <div id="mandatory-badge" class="hidden" style="margin-top:14px"></div>
+      <div id="mandatory-badge" class="hidden" style="margin-top:16px"></div>
       <div class="dl-actions">
-        <a id="download-btn" class="btn" href="#" target="_blank" rel="noopener">Скачать лаунчер</a>
+        <a id="download-btn" class="btn" href="#" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>
+          Скачать лаунчер
+        </a>
+        <a class="btn secondary" href="../test/index.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H4z"/><path d="M9 21h6"/><path d="M12 16v5"/></svg>
+          Демо-версия в браузере
+        </a>
       </div>
       <div id="notes" class="notes"></div>
     </section>
 
-    <section class="card" id="smartscreen">
+    <section class="card" id="help">
       <h2>Windows не даёт запустить файл?</h2>
-      <p class="smartscreen-lead">
-        Лаунчер &mdash; один exe без установки, поэтому при первом запуске Windows показывает
-        «Система Windows защитила ваш компьютер» или «Не удалось найти приложение».
-        Это не вирус: файл просто новый и пока без цифровой подписи.
-      </p>
+      <p class="sub">SmartScreen предупреждает о файлах без цифровой репутации — это нормально для маленьких проектов. Вот как пройти окно.</p>
 
       <h3>Окно «Система Windows защитила ваш компьютер»</h3>
-      <p class="smartscreen-lead">
-        Синий экран с текстом «Фильтр SmartScreen в Microsoft Defender предотвратил запуск
-        неопознанного приложения» и единственной кнопкой «Не выполнять» внизу справа.
-      </p>
+      <p>Нажмите <b>«Подробнее»</b>, затем появившуюся кнопку <b>«Выполнить в любом случае»</b>.</p>
       <ol class="steps">
         <li>Нажмите ссылку <b>«Подробнее»</b> слева, под текстом про неопознанное приложение.</li>
         <li>Внизу слева появится кнопка <b>«Выполнить в любом случае»</b> &mdash; нажмите её.</li>
@@ -336,13 +520,10 @@
       </ol>
 
       <h3>Как убрать предупреждение навсегда</h3>
-      <p class="smartscreen-lead">
-        Окно исчезает только после подписи файла цифровым сертификатом (OV/EV).
-        Без подписи Windows будет показывать его при каждом новом обновлении лаунчера.
-      </p>
+      <p>Предупреждение SmartScreen зависит от репутации файла в Microsoft. Она растёт по мере скачиваний, а также снимается при подписи кода.</p>
     </section>
 
-    <section class="card">
+    <section class="card" id="howto">
       <h2>Как играть</h2>
       <ol class="steps">
         <li>Скачайте exe и сохраните его в любое место.</li>
@@ -352,20 +533,23 @@
       </ol>
     </section>
 
-    <section class="card">
+    <section class="card" id="server">
       <h2>Сервер</h2>
+      <p class="sub">Адрес для подключения из обычного Minecraft.</p>
       <div class="server">
         <code id="server-addr">craftunity3.mcsh.io:25565</code>
-        <button id="copy-btn" class="btn secondary" type="button">Скопировать адрес</button>
+        <button id="copy-btn" class="btn secondary" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4H6.5A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></svg>
+          Скопировать адрес
+        </button>
       </div>
-      <div id="copy-status" class="copied"></div>
-      <p style="color:var(--muted);margin:10px 0 0;font-size:14px">
-        Один и тот же адрес используется в лаунчере &mdash; вводить его вручную не нужно.
-      </p>
+      <div id="copy-status" class="copied" aria-live="polite"></div>
+      <p style="color:var(--muted);margin:6px 0 0;font-size:14px">Порт по умолчанию &mdash; 25565, если он не указан.</p>
     </section>
 
     <footer>
       <span id="server-footer">craftunity3.mcsh.io</span>
+      <span>Craftunity &middot; лаунчер и сборка</span>
     </footer>
   </div>
 
@@ -487,21 +671,20 @@ function fallbackCopy(text) {
   return ok;
 }
 
+function showCopied(ok) {
+  copyStatus.textContent = ok ? "Адрес скопирован" : "";
+  if (ok) setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+}
+
 copyBtn.addEventListener("click", function () {
-  var done = false;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(SERVER_ADDR).then(function () {
-      copyStatus.textContent = "Адрес скопирован";
-      setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+      showCopied(true);
     }).catch(function () {
-      done = fallbackCopy(SERVER_ADDR);
-      copyStatus.textContent = done ? "Адрес скопирован" : "";
-      if (done) setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+      showCopied(fallbackCopy(SERVER_ADDR));
     });
   } else {
-    done = fallbackCopy(SERVER_ADDR);
-    copyStatus.textContent = done ? "Адрес скопирован" : "";
-    if (done) setTimeout(function () { copyStatus.textContent = ""; }, 2500);
+    showCopied(fallbackCopy(SERVER_ADDR));
   }
 });
 </script>
