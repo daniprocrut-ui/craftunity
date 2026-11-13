@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Craftunity Launcher 1.5.37 — демо</title>
+<style>
+:root {
+  --bg: #090b14;
+  --panel: #141a2c;
+  --card: #1c2338;
+  --line: #2a3350;
+  --text: #e9eefb;
+  --muted: #8b95b2;
+  --danger: #f87171;
+  --accent: #fb923c;
+  --accent-fg: #1c0f02;
+  --accent-grad: linear-gradient(135deg, #ffc088 0%, #fb923c 55%, #c86a22 100%);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+code {
+  font-family: Consolas, monospace;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+h1 { margin: 0; font-size: 22px; font-weight: 600; }
+h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+
+.muted { color: var(--muted); margin: 0; font-size: 12px; line-height: 1.5; }
+.muted + .muted { margin-top: 6px; }
+.small { font-size: 11px; }
+.mb { margin-bottom: 16px; }
+.lbl { display: block; color: var(--muted); font-size: 12px; margin: 14px 0 6px; }
+
+/* ---------- layout ---------- */
+
+.app {
+  display: grid;
+  grid-template-columns: 208px 1fr;
+  min-height: 100vh;
+}
+
+.app.compact { grid-template-columns: 72px 1fr; }
+
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+
+.brand-mark {
+  width: 36px; height: 36px; border-radius: 12px;
+  background: var(--accent-grad);
+  color: var(--accent-fg);
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 18px;
+  flex: none;
+}
+
+.brand-text { line-height: 1.2; }
+.brand-text b { font-size: 13px; letter-spacing: .2px; }
+.brand-text span { display: block; font-size: 10px; color: var(--muted); letter-spacing: .6px; }
+
+.app.compact .brand-text { display: none; }
+
+.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+
+.nav button {
+  display: flex; align-items: center; gap: 10px;
+  background: transparent;
+  color: var(--text);
+  border: 0; border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left;
+  position: relative;
+}
+
+.nav button .ico { width: 16px; text-align: center; color: var(--muted); }
+.nav button:hover { background: var(--card); }
+.nav button.active { background: var(--card); }
+.nav button.active .lbl { color: var(--accent); font-weight: 600; }
+.nav button.active .ico { color: var(--accent); }
+
+.app.compact .nav button { justify-content: center; padding: 10px 0; }
+.app.compact .nav .lbl { display: none; }
+
+.badge {
+  position: absolute; right: 8px;
+  background: var(--danger); color: #fff;
+  border-radius: 8px; padding: 1px 6px;
+  font-size: 11px; font-style: normal; font-weight: 700;
+}
+
+.side-foot { color: var(--muted); font-size: 11px; line-height: 1.7; }
+.side-foot .net { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.dot.ok { background: var(--accent); }
+
+.app.compact .side-foot { display: none; }
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 24px 8px;
+}
+
+.sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+.pill {
+  display: flex; gap: 6px; align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.pill span { color: var(--muted); }
+.pill b { font-weight: 600; }
+
+.content { padding: 8px 24px 8px; overflow: auto; }
+
+.view { display: none; }
+.view.active { display: block; }
+
+.statusbar {
+  display: flex; justify-content: space-between;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  padding: 8px 28px;
+  font-size: 12px;
+}
+
+/* ---------- controls ---------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--card);
+  color: var(--text);
+  border: 0; border-radius: 10px;
+  padding: 9px 16px;
+  height: 36px;
+  font: inherit; font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn:hover { background: #232b44; }
+.btn[disabled] { opacity: .55; cursor: default; }
+.btn.small { height: 30px; padding: 5px 12px; font-size: 12px; }
+.btn.icon { width: 38px; padding: 0; font-size: 15px; }
+
+.btn.primary {
+  background: var(--accent-grad);
+  color: var(--accent-fg);
+  font-weight: 600; font-size: 15px;
+  height: 40px; padding: 10px 26px; min-width: 110px;
+}
+
+input[type="text"], input[type="password"], select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 16px;
+  height: 40px;
+  font: inherit; font-size: 12px;
+  width: 100%;
+}
+
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+input[readonly] { opacity: .8; }
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr 170px auto auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tabs { display: flex; gap: 0; margin-top: 14px; flex-wrap: wrap; }
+.tabs button {
+  background: transparent; color: var(--muted);
+  border: 0; border-radius: 8px;
+  padding: 8px 16px;
+  font: inherit; font-size: 12.5px;
+  cursor: pointer;
+}
+.tabs button:hover { background: var(--card); }
+.tabs button.active { background: var(--card); color: var(--accent); }
+.tabs button.ghostdemo { margin-left: 6px; }
+
+/* ---------- cards ---------- */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 14px;
+  align-items: start;
+}
+
+.stack { display: grid; gap: 12px; }
+
+.hero { display: flex; gap: 16px; align-items: center; }
+
+.avatar {
+  width: 96px; height: 96px; border-radius: 18px;
+  background: var(--bg);
+  display: grid; place-items: center;
+  font-size: 36px; font-weight: 700;
+  color: var(--accent);
+  flex: none;
+}
+
+.hero-info .name { font-size: 24px; font-weight: 600; }
+.hero-info .type { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.play-row { display: flex; align-items: center; gap: 14px; margin-top: 20px; }
+.hint { color: var(--muted); font-size: 12px; }
+
+.warn {
+  margin-top: 16px; padding: 12px;
+  border: 1px solid rgba(255, 193, 7, .4);
+  background: rgba(255, 193, 7, .08);
+  border-radius: 12px;
+  color: #e8d9b0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.progress { margin-top: 18px; }
+.bar { height: 8px; background: var(--card); border-radius: 999px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent-grad); border-radius: 999px; }
+.progress .meta {
+  display: flex; justify-content: space-between;
+  color: var(--muted); font-size: 12px; margin-top: 6px;
+}
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.actions.col { flex-direction: column; align-items: flex-start; }
+
+.state-list { display: grid; gap: 8px; }
+.state-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.state-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.state-row b { font-weight: 600; }
+.state-row span { color: var(--muted); text-align: right; }
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.mod {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 8px; padding: 16px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.mod-icon {
+  width: 96px; height: 96px; border-radius: 22px;
+  display: grid; place-items: center;
+  font-size: 34px; font-weight: 700;
+  flex: none;
+}
+
+.mod-icon.small { width: 56px; height: 56px; border-radius: 16px; font-size: 20px; }
+.mod-title { font-size: 13.5px; font-weight: 600; }
+.mod-desc {
+  color: var(--muted); font-size: 11.5px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.mod-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 4px; }
+.mod-foot span { color: var(--muted); font-size: 11px; }
+
+.inst {
+  display: flex; gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+}
+.inst-body { min-width: 0; }
+.inst-title { font-size: 13.5px; font-weight: 600; }
+.inst-meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.inst-desc {
+  color: var(--muted); font-size: 11.5px; line-height: 1.45; margin-top: 8px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ---------- files / skin ---------- */
+
+.file-list { display: grid; gap: 8px; margin-top: 10px; }
+.file-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; font-size: 12px;
+}
+
+.skin-row { display: flex; gap: 16px; margin-top: 14px; }
+.skin-box {
+  width: 160px; height: 200px; border-radius: 18px;
+  background: var(--bg); display: grid; place-items: center; flex: none;
+}
+.skin-side { display: grid; gap: 8px; align-content: start; flex: 1; }
+.skin-side select { width: 180px; }
+
+/* ---------- chat ---------- */
+
+.chat-view.active { display: grid; grid-template-columns: 230px 1fr; gap: 12px; }
+
+.chat-side h3 { margin-bottom: 10px; }
+
+.peer-list, .room-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.peer-list { max-height: 170px; overflow: auto; }
+.room-list { margin-top: 10px; }
+.peer-list li, .room-list li {
+  padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: 12.5px;
+}
+.peer-list li:hover, .room-list li:hover { background: var(--card); }
+.room-list li.active { background: var(--card); color: var(--accent); font-weight: 600; }
+
+.chat-main { display: flex; flex-direction: column; gap: 12px; min-height: 520px; }
+
+.chat-head { display: flex; align-items: center; gap: 14px; }
+.chat-head h3 { margin: 0; }
+
+.chat-feed { flex: 1; overflow: auto; padding: 14px; }
+
+.msg {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  display: flex; gap: 10px;
+}
+.msg-avatar {
+  width: 36px; height: 36px; border-radius: 12px;
+  background: var(--bg); display: grid; place-items: center;
+  font-weight: 700; font-size: 14px; flex: none;
+}
+.msg-body { min-width: 0; flex: 1; }
+.msg-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.msg-author { font-size: 13px; font-weight: 600; }
+.msg-time { font-size: 11px; color: var(--muted); }
+.msg-edited { font-size: 10px; color: var(--muted); }
+.msg-text { font-size: 13px; line-height: 1.5; margin-top: 4px; }
+.msg-image {
+  margin-top: 8px; height: 96px; border-radius: 10px;
+  background: linear-gradient(135deg, #2a3350, #1c2338);
+  border: 1px solid var(--line);
+  display: grid; place-items: center;
+  color: var(--muted); font-size: 11px;
+  max-width: 220px;
+}
+.reacts { display: flex; gap: 4px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.react {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 3px 8px;
+  font: inherit; font-size: 11.5px; color: var(--text); cursor: pointer;
+}
+.react.mine { border-color: var(--accent); color: var(--accent); }
+.reacts .muted { margin-left: 6px; }
+
+.composer-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; }
+.composer-row input { height: 40px; }
+
+/* ---------- settings ---------- */
+
+.themes { gap: 6px; }
+.checks { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-size: 12.5px; }
+.checks label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 18px; font-size: 12.5px;
+  opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+  z-index: 50;
+}
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+.chat-toast {
+  position: fixed; right: 20px; bottom: 20px;
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 10px 12px 12px;
+  max-width: 380px; font: inherit; color: var(--text);
+  text-align: left; cursor: pointer;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .45);
+  z-index: 60;
+}
+.ct-avatar {
+  width: 40px; height: 40px; border-radius: 12px; background: var(--bg);
+  display: grid; place-items: center; font-weight: 700; flex: none;
+}
+.ct-body { display: grid; gap: 3px; }
+.ct-body b { font-size: 12.5px; }
+.ct-body span { color: var(--muted); font-size: 11.5px; }
+.ct-close { color: var(--muted); font-size: 11px; padding: 2px 4px; }
+
+@media (max-width: 980px) {
+  .app, .app.compact { grid-template-columns: 72px 1fr; }
+  .brand-text, .side-foot, .nav .lbl { display: none; }
+  .nav button { justify-content: center; padding: 10px 0; }
+  .split { grid-template-columns: 1fr; }
+  .chat-view.active { grid-template-columns: 1fr; }
+  .toolbar { grid-template-columns: 1fr 1fr; }
+}
+
+.view:not(.active){display:none}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFC088"/>
+      <stop offset="0.55" stop-color="#FB923C"/>
+      <stop offset="1" stop-color="#C86A22"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div class="brand-text" id="brandText"><b>CRAFTUNITY</b><span>LAUNCHER</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="play" class="active"><span class="ico">▶</span><span class="lbl">Играть</span></button>
+      <button data-view="mods"><span class="ico">◀</span><span class="lbl">Контент</span></button>
+      <button data-view="installed"><span class="ico">▣</span><span class="lbl">Установлено</span></button>
+      <button data-view="files"><span class="ico">▤</span><span class="lbl">Файлы</span></button>
+      <button data-view="skin"><span class="ico">☻</span><span class="lbl">Скин</span></button>
+      <button data-view="account"><span class="ico">◉</span><span class="lbl">Аккаунт</span></button>
+      <button data-view="chat"><span class="ico">✉</span><span class="lbl">Чат</span><i class="badge" id="chatBadge" hidden>2</i></button>
+      <button data-view="settings"><span class="ico">⚙</span><span class="lbl">Настройки</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="net"><span class="dot ok"></span><span>Сервер доступен</span></div>
+      <div>Версия лаунчера <span id="launcherVer">1.5.37</span></div>
+      <div>craftunity.mcsh.io</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="viewTitle">Играть</h1>
+        <div class="sub" id="viewSub">Craftunity — один клиент, один сервер</div>
+      </div>
+      <div class="topbar-actions">
+        <a class="btn ghost small" id="backLink" href="../index.html" title="Вернуться на сайт">← Назад</a>
+        <button class="btn small" id="themeToggle" title="Следующая тема">Тёмная</button>
+        <div class="pill"><span>Сервер</span><b>craftunity.mcsh.io:25565</b></div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- ИГРАТЬ -->
+      <section class="view active" id="view-play">
+        <div class="split">
+          <div class="card">
+            <div class="hero">
+              <div class="avatar" id="avatarBig">Д</div>
+              <div class="hero-info">
+                <div class="name" id="heroName">Danipro914</div>
+                <div class="type" id="heroType">Аккаунт ely.by</div>
+                <div class="chips"><span class="chip">Модпак 1.20.1 · Fabric</span><span class="chip">Моды: 20</span></div>
+              </div>
+            </div>
+            <div class="play-row">
+              <button class="btn primary" disabled>Играть</button>
+              <span class="hint">Клиент обновится автоматически</span>
+            </div>
+            <div class="warn">Версия сверена с сервером сборки: 1.20.1 · Fabric. Клиент обновится при запуске.</div>
+            <div class="progress"><div class="bar"><i style="width:38%"></i></div>
+              <div class="meta"><span>Проверка файлов</span><span>38%</span></div></div>
+            <div class="actions">
+              <button class="btn small" disabled>Показать лог</button>
+              <button class="btn small" disabled>Проверить файлы</button>
+              <button class="btn small" disabled>Обновить манифест</button>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="card">
+              <h3>Сервер</h3>
+              <p class="muted">Добро пожаловать на Craftunity!<br>Адрес сервера: craftunity.mcsh.io:25565<br>Режим: смешанный, с лицензией</p>
+              <button class="btn small" disabled>Скопировать IP</button>
+            </div>
+            <div class="card">
+              <h3>Состояние клиента</h3>
+              <div class="state-list">
+                <div class="state-row"><b>Манифест</b><span>сборка 1.20.1</span></div>
+                <div class="state-row"><b>Клиент</b><span>версия не проверена</span></div>
+                <div class="state-row"><b>Java</b><span>jdk-17 · найдена</span></div>
+                <div class="state-row"><b>Папка игры</b><span>~/.craftunity</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- КОНТЕНТ -->
+      <section class="view" id="view-mods">
+        <div class="card mb">
+          <h3>Установка модов</h3>
+          <p class="muted">Моды берутся из каталога Modrinth и ставятся в папку <code>mods</code>.</p>
+          <div class="tabs" id="kindTabs">
+            <button data-kind="mod" class="active">Моды</button>
+            <button data-kind="resourcepack">Ресурспаки</button>
+            <button data-kind="shader">Шейдеры</button>
+          </div>
+          <div class="toolbar">
+            <input type="text" id="modQuery" placeholder="Название мода, например Sodium">
+            <select><option>По релевантности</option><option>По загрузкам</option><option>Новые</option></select>
+            <button class="btn" disabled>Найти</button>
+            <button class="btn" disabled>Добавить .jar</button>
+          </div>
+          <p class="muted small" id="modFilter">Показано 12 модов под текущую версию</p>
+        </div>
+        <div class="grid-cards" id="modResults"></div>
+      </section>
+
+      <!-- УСТАНОВЛЕНО -->
+      <section class="view" id="view-installed">
+        <div class="tabs mb"><button data-filter="all" class="active">Всё</button><button data-filter="mod">Моды</button><button data-filter="modpack">Модпак</button><button data-filter="resourcepack">Ресурспаки</button><button data-filter="shader">Шейдеры</button><button class="ghostdemo" disabled>Обновить</button></div>
+        <p class="muted mb">Здесь всё, что установлено через лаунчер или положено вручную.</p>
+        <div class="grid-cards" id="installedList"></div>
+      </section>
+
+      <!-- ФАЙЛЫ -->
+      <section class="view" id="view-files">
+        <div class="split">
+          <div class="card">
+            <h3>Игровые файлы</h3>
+            <p class="muted">Киньте конфиги, настройки, миры или другие файлы — они попадут в папку игры.</p>
+            <label class="lbl">Куда положить</label>
+            <select class="full"><option>Корень игры</option><option>config</option><option>mods</option><option>resourcepacks</option><option>shaderpacks</option><option>saves</option></select>
+            <div class="actions col"><button class="btn" disabled>Выбрать файлы…</button><button class="btn" disabled>Открыть папку игры</button></div>
+          </div>
+          <div class="card">
+            <h3>В выбранной папке</h3>
+            <p class="muted">mods · 20 файлов</p>
+            <div class="file-list">
+              <div class="file-row"><span>sodium-fabric-0.5.11.jar</span><span class="muted">1.2 МБ</span></div>
+              <div class="file-row"><span>iris-mc1.20.1-1.7.3.jar</span><span class="muted">902 КБ</span></div>
+              <div class="file-row"><span>fabric-api-0.92.2.jar</span><span class="muted">2.0 МБ</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- СКИН -->
+      <section class="view" id="view-skin">
+        <div class="split">
+          <div class="card">
+            <h3>Ваш скин</h3>
+            <p class="muted">PNG 64×64 (или 64×32).</p>
+            <div class="skin-row">
+              <div class="skin-box"><canvas id="skinCanvas" width="160" height="200"></canvas></div>
+              <div class="skin-side">
+                <label class="lbl">Модель</label>
+                <select id="skinModel"><option value="classic">Classic (Steve)</option><option value="slim">Slim (Alex)</option></select>
+                <button class="btn" disabled>Выбрать PNG…</button>
+                <button class="btn" disabled>Применить локально</button>
+                <button class="btn" disabled>Скин на ely.by</button>
+              </div>
+            </div>
+            <p class="muted small">Скин ещё не загружен.</p>
+          </div>
+          <div class="card">
+            <h3>Где применяется скин</h3>
+            <p class="muted">Локальный скин хранится в папке лаунчера и виден вам. На сервере Craftunity скин показывается, если вы вошли через ely.by или администратор включил серверный плагин скинов.</p>
+            <button class="btn" disabled>Открыть папку данных</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- АККАУНТ -->
+      <section class="view" id="view-account">
+        <div class="split">
+          <div class="card">
+            <h3>Оффлайн-аккаунт</h3>
+            <p class="muted">Ник для игры без авторизации. Подходит для серверов с online-mode=false.</p>
+            <label class="lbl">Ник (3–16 символов)</label>
+            <input type="text" value="Danipro914" maxlength="16">
+            <button class="btn" disabled>Играть оффлайн</button>
+          </div>
+          <div class="card">
+            <h3>Аккаунт ely.by</h3>
+            <p class="muted">Скины, плащи и авторизация на сервере.</p>
+            <label class="lbl">Логин или e-mail</label>
+            <input type="text" value="danipro914">
+            <label class="lbl">Пароль</label>
+            <input type="password" value="demo-password">
+            <div class="actions">
+              <button class="btn primary" disabled>Войти через ely.by</button>
+              <button class="btn" disabled>Регистрация</button>
+              <button class="btn" disabled>Выйти</button>
+            </div>
+            <p class="muted small">Пароль передаётся напрямую на authserver.ely.by и не сохраняется.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ЧАТ -->
+      <section class="view chat-view" id="view-chat">
+        <div class="card chat-side">
+          <h3>Чаты</h3>
+          <p class="muted small">Личные сообщения</p>
+          <ul class="peer-list" id="peers">
+            <li data-peer="SonicWave">SonicWave</li>
+            <li data-peer="Panda_MC">Panda_MC</li>
+            <li data-peer="Kotik">Kotik</li>
+          </ul>
+          <ul class="room-list" id="rooms">
+            <li data-room="general" class="active">Общий чат</li>
+            <li data-room="announcements">Объявления</li>
+            <li data-room="news">Новости</li>
+          </ul>
+        </div>
+        <div class="chat-main">
+          <div class="card chat-head">
+            <h3 id="chatTitle">Общий чат</h3>
+            <button class="btn small" disabled>Обновить</button>
+            <span class="muted small" id="chatState">Обновлено только что</span>
+          </div>
+          <div class="card chat-feed"><div id="chatList"></div></div>
+          <div class="composer">
+            <p class="muted small" id="chatReadNote" hidden></p>
+            <div class="composer-row" id="composerRow">
+              <button class="btn icon" disabled title="Прикрепить картинку">🖼</button>
+              <input type="text" id="chatInput" maxlength="500" placeholder="Сообщение в «Общий чат»">
+              <button class="btn primary" disabled>Отправить</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- НАСТРОЙКИ -->
+      <section class="view" id="view-settings">
+        <div class="card mb">
+          <h3>Внешний вид</h3>
+          <p class="muted">Тема применяется сразу и сохраняется в настройках лаунчера.</p>
+          <div class="tabs themes" id="themeTiles"></div>
+          <div class="checks">
+            <label><input type="checkbox">Уменьшить анимации</label>
+            <label><input type="checkbox" checked>Автоматически скачивать Java</label>
+            <label><input type="checkbox" checked>Автовход на сервер</label>
+            <label><input type="checkbox">Праздничное оформление</label>
+            <label><input type="checkbox" checked>Звук новых сообщений</label>
+          </div>
+        </div>
+        <div class="split">
+          <div class="card">
+            <h3>Каталоги модов</h3>
+            <p class="muted">Поиск идёт по Modrinth и CurseForge. Дубли ставятся с Modrinth.</p>
+            <label class="lbl">Ключ CurseForge API</label>
+            <input type="text" placeholder="Без ключа поиск идёт только по Modrinth">
+            <p class="muted small">CurseForge выключен</p>
+            <div class="actions"><button class="btn" disabled>Получить ключ</button><button class="btn" disabled>Проверить и сохранить</button></div>
+          </div>
+          <div class="card">
+            <h3>Игра</h3>
+            <label class="lbl">Память (МБ)</label><input type="text" value="4096">
+            <label class="lbl">Java</label><input type="text" value="C:\Program Files\Java\jdk-17\bin\java.exe">
+            <label class="lbl">Версия клиента (задаётся админ-панелью)</label><input type="text" value="1.20.1 · Fabric" readonly>
+            <label class="lbl">Адрес сервера</label><input type="text" value="craftunity.mcsh.io:25565" readonly>
+            <div class="actions"><button class="btn primary" disabled>Сохранить</button><button class="btn" disabled>Папка игры</button><button class="btn" disabled>Логи</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Манифест и обновления</h3>
+          <p class="muted">Адрес находится автоматически: маяк админ-панели, затем сохранённая копия.</p>
+          <p class="muted">Маяк админ-панели · craftunity.mcsh.io</p>
+          <button class="btn" disabled>Обновить манифест</button>
+          <p class="muted small">Обновлён только что · сборка 1.20.1</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="statusbar"><span id="statusText">Готово к запуску</span><span>v1.5.37</span></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<button class="chat-toast" id="chatToast" hidden>
+  <span class="ct-avatar">S</span>
+  <span class="ct-body"><b>SonicWave</b><span>Скинул скрин постройки в общий чат</span></span>
+  <span class="ct-close" id="ctClose">✕</span>
+</button>
+<script>
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+const VIEW_META = {
+  play: ["Играть", "Craftunity — один клиент, один сервер"],
+  mods: ["Контент", "Моды, ресурспаки и шейдеры с установкой в один клик"],
+  installed: ["Установлено", "Ваши моды, ресурспаки и шейдеры"],
+  files: ["Файлы", "Свои файлы в папке игры"],
+  skin: ["Скин", "Загрузка и предпросмотр скина"],
+  account: ["Аккаунт", "Оффлайн-профиль или ely.by"],
+  chat: ["Чат", "Общий чат, объявления, новости и личные сообщения"],
+  settings: ["Настройки", "Java, память, темы, манифест обновлений"],
+};
+
+// Палитры взяты из c#launcher/Themes.cs — те же 14 тем и тот же порядок.
+const THEMES = [
+  ["dark", "Тёмная", "#090b14", "#141a2c", "#1c2338", "#e9eefb", "#8b95b2", "#fb923c", "#1c0f02", "#2a3350"],
+  ["light", "Светлая", "#f3f4f8", "#ffffff", "#eef1f7", "#171a24", "#626a80", "#ea580c", "#ffffff", "#d7dbe8"],
+  ["midnight", "Полуночная", "#04060e", "#0f1628", "#16203a", "#e6ecfb", "#7f8cad", "#38bdf8", "#04121d", "#22304f"],
+  ["forest", "Лесная", "#07100c", "#102018", "#16291f", "#e8f6ed", "#88a695", "#4ade80", "#04140b", "#24402f"],
+  ["sunset", "Закатная", "#150811", "#2a1226", "#381a31", "#fdeaf6", "#b48ba6", "#fb7185", "#2a0712", "#4d2545"],
+  ["ocean", "Океанская", "#04121b", "#0b2b3d", "#0f3850", "#e3f6fd", "#7fa6b8", "#2dd4bf", "#03201f", "#1b526d"],
+  ["sakura", "Сакура", "#1a0f16", "#301a28", "#3d2233", "#fdeaf4", "#b48ea3", "#f472b6", "#2b0a1c", "#57304a"],
+  ["neon", "Неоновая", "#050208", "#120a22", "#1a0f30", "#f0e8ff", "#9080b0", "#a855f7", "#16042b", "#2d1a4d"],
+  ["graphite", "Графитовая", "#0e1013", "#1d2126", "#262b32", "#eef1f5", "#8b95a1", "#9aa7b8", "#14171b", "#363d46"],
+  ["crimson", "Багровая", "#120508", "#261014", "#32161b", "#fde8ec", "#b58a95", "#ef4444", "#240507", "#4a2028"],
+  ["coffee", "Кофейная", "#14100c", "#261f18", "#322920", "#f6eee4", "#a8947d", "#c1814a", "#1f1308", "#4a3d2e"],
+  ["sand", "Песочная", "#f6efe2", "#fffdf7", "#f3ead9", "#2a2117", "#7d6a52", "#b45309", "#2a1a05", "#dccdb2"],
+  ["lavender", "Лавандовая", "#f3f2fb", "#ffffff", "#f0eefb", "#1e1a33", "#6b6490", "#7c3aed", "#ffffff", "#d8d3ef"],
+  ["arctic", "Арктическая", "#eef4f8", "#ffffff", "#eaf2f8", "#10222e", "#5e7b8d", "#0284c7", "#ffffff", "#cfdee8"],
+];
+
+const CATALOG = {
+  mod: [
+    ["fabric-api", "Fabric API", "Lightweight and modular API providing common hooks and intercompatibility measures", "#9aa7b8", "4.8M", true],
+    ["sodium", "Sodium", "A high-performance rendering engine replacement for Minecraft", "#2f9e44", "31.2M", true],
+    ["iris", "Iris Shaders", "Modern shader pack loader compatible with existing OptiFine packs", "#7a5cf0", "15.6M", true],
+    ["entityculling", "Entity Culling", "Async path-tracing to hide blocks and entities that are not visible", "#4b5563", "19.8M", false],
+    ["lithium", "Lithium", "No-compromises game logic and performance optimization mod", "#5ec26a", "22.4M", false],
+    ["indium", "Indium", "Sodium addon providing support for the Fabric Rendering API", "#8b5cf6", "9.7M", true],
+    ["modmenu", "Mod Menu", "Adds a mod menu to view a list of your installed mods", "#3b82f6", "26.9M", false],
+    ["jade", "Jade", "Information about what you are looking at, at the top of your screen", "#f59e0b", "11.3M", false],
+    ["ferritecore", "FerriteCore", "Reduces memory usage", "#ef4444", "8.2M", false],
+    ["cloth-config", "Cloth Config API", "Configuration library for Minecraft mods", "#64748b", "14.5M", false],
+    ["architectury", "Architectury API", "Intermediary api easing development of multiplatform mods", "#0ea5e9", "10.9M", false],
+    ["cobblemon", "Cobblemon", "Fabric side-service mod adding Pokémon-style creatures", "#f59e0b", "3.1M", true],
+  ],
+  resourcepack: [
+    ["faithful", "Faithful 32x", "Classic 32x texture pack preserving the vanilla look", "#d97706", "6.1M", false],
+    ["fresh-animations", "Fresh Animations", "Enhanced vanilla entity animations", "#22c55e", "4.4M", false],
+    ["stay-true", "Stay True", "Reduces the noise level of vanilla textures", "#a855f7", "2.7M", false],
+    ["bare-bones", "Bare Bones", "Simplistic resource pack with clean textures", "#e11d48", "1.9M", false],
+  ],
+  shader: [
+    ["complementary", "Complementary Reimagined", "Well-balanced shader with realistic lighting", "#16a34a", "9.3M", false],
+    ["bliss", "Bliss Shaders", "Lush lighting with soft shadows and volumetric fog", "#f97316", "5.2M", false],
+    ["photon", "Photon Shader", "High quality shader with gorgeous lighting and fast performance", "#eab308", "3.8M", false],
+    ["bsl", "BSL Shaders", "Shader pack with colorful lighting and water", "#0ea5e9", "7.6M", false],
+  ],
+};
+
+const INSTALLED = [
+  ["cobblemon", "Cobblemon", "мод", "1.3.0 · 26.2", "A Fabric side-service mod adding Pokémon-style creatures", "#f59e0b"],
+  ["polymer", "Polymer", "мод", "0.17.5 · 26.2", "Library for creating better server side content", "#a16207"],
+  ["universal-graves", "Universal Graves", "мод", "3.12.0 · 26.2", "Customisable grave mod for Fabric", "#7c7c7c"],
+  ["repurposed-structures", "Repurposed Structures", "мод", "7.7.6 · 26.2", "More variations of vanilla structures", "#166534"],
+  ["midnightlib", "MidnightLib", "мод", "1.1.0 · 26.2-fabric", "Lightweight configuration system", "#6366f1"],
+  ["forge-config-api", "Forge Config API Port", "мод", "26.2-1.1", "Forge and NeoForge config systems for other ecosystems", "#d6a02c"],
+  ["travellers-backpack", "Traveller's Backpack", "мод", "1.1.7 · 26.2-fabric", "Upgradeable backpacks with customisation", "#8b5a2b"],
+  ["sodium", "Sodium", "мод", "0.5.11 · 26.2", "High-performance rendering engine", "#2f9e44"],
+  ["iris", "Iris Shaders", "мод", "1.7.3 · 26.2", "Modern shader pack loader", "#7a5cf0"],
+  ["complementary", "Complementary Reimagined", "шейдер", "r5.2", "Well-balanced shader with realistic lighting", "#16a34a"],
+  ["faithful", "Faithful 32x", "ресурспак", "r3", "32x texture pack preserving vanilla look", "#d97706"],
+  ["craftunity-pack", "Craftunity Pack", "модпак", "1.20.1", "Сборка сервера Craftunity", "#fb923c"],
+];
+
+const CHATS = {
+  general: [
+    { author: "SonicWave", mine: false, time: "14:02", text: "Кто-нибудь ставил новый шейдер? На 1.20.1 очень бодро.", reacts: [["👍", 3], ["🔥", 1]] },
+    { author: "Panda_MC", mine: false, time: "14:05", text: "Да, поставил Complementary через вкладку Контент. Всё в один клик.", image: "скриншот · 1280×720", reacts: [["👍", 5]] },
+    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.37 — обновится при следующем запуске.", reacts: [["❤️", 2], ["😄", 1]] },
+    { author: "Kotik", mine: false, time: "14:11", text: "У меня клиент скачался, но Java качается второй раз.", edited: true, reacts: [] },
+    { author: "Danipro914", mine: true, time: "14:12", text: "Это кэш Java: во вкладке Настройки выключи «Автоматически скачивать Java», если 17 уже стоит.", reacts: [["👍", 1]] },
+  ],
+  announcements: [
+    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.37: чат, реакции на сообщения и картинки из буфера.", reacts: [["🔥", 7], ["👍", 4]] },
+    { author: "Danipro914", mine: true, time: "13:40", text: "Сервер переключён на 1.20.1 · Fabric. Все моды подтянутся автоматически.", reacts: [["👍", 3]] },
+  ],
+  news: [
+    { author: "Danipro914", mine: true, time: "12:00", text: "Чат появился в лаунчере: общий чат, объявления и личные сообщения с уведомлениями.", reacts: [["❤️", 9], ["🔥", 5]] },
+  ],
+  dm: {
+    SonicWave: [{ author: "SonicWave", mine: false, time: "14:01", text: "Скинь ссылку на демо, гляну с телефона.", reacts: [] }],
+    Panda_MC: [{ author: "Panda_MC", mine: false, time: "13:58", text: "Можешь добавить ресурспак в сборку по умолчанию?", reacts: [] }],
+    Kotik: [{ author: "Kotik", mine: false, time: "13:44", text: "А модпак обновится сам или руками переставлять?", reacts: [] }],
+  },
+};
+
+const state = { view: "play", kind: "mod", filter: "all", room: "general", peer: "", theme: "dark" };
+
+function initials(name) {
+  return (name || "?").replace(/[^A-Za-zА-Яа-я0-9]/g, "").slice(0, 1).toUpperCase();
+}
+
+function mix(hex, other, amount) {
+  const parse = (v) => [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16));
+  const a = parse(hex);
+  const b = parse(other);
+  const out = a.map((v, i) => Math.round(v + (b[i] - v) * amount));
+  return "#" + out.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
+function applyTheme(id) {
+  const theme = THEMES.find((t) => t[0] === id) || THEMES[0];
+  const [, name, bg, panel, card, text, muted, accent, accentFg, border] = theme;
+  const root = document.documentElement.style;
+  root.setProperty("--bg", bg);
+  root.setProperty("--panel", panel);
+  root.setProperty("--card", card);
+  root.setProperty("--line", border);
+  root.setProperty("--text", text);
+  root.setProperty("--muted", muted);
+  root.setProperty("--accent", accent);
+  root.setProperty("--accent-fg", accentFg);
+  root.setProperty("--accent-grad", `linear-gradient(135deg, ${mix(accent, "#ffffff", 0.45)} 0%, ${accent} 55%, ${mix(accent, "#000000", 0.22)} 100%)`);
+  const grad = $("#accentGrad");
+  if (grad) {
+    grad.children[0].setAttribute("stop-color", mix(accent, "#ffffff", 0.45));
+    grad.children[1].setAttribute("stop-color", accent);
+    grad.children[2].setAttribute("stop-color", mix(accent, "#000000", 0.22));
+  }
+  document.documentElement.dataset.theme = theme[0];
+  state.theme = theme[0];
+  const toggle = $("#themeToggle");
+  if (toggle) toggle.textContent = name;
+  $$("#themeTiles button").forEach((b) => b.classList.toggle("active", b.dataset.theme === theme[0]));
+}
+
+function toast(message) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.classList.add("on");
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove("on"), 2600);
+}
+
+function modCard([slug, title, desc, color, downloads, installed]) {
+  return `<div class="mod">
+    <div class="mod-icon" style="background:${color}22;color:${color}">${initials(title)}</div>
+    <div class="mod-title">${title}</div>
+    <div class="mod-desc">${desc}</div>
+    <div class="mod-foot"><span>${downloads}</span>
+      <button class="btn small" disabled>${installed ? "Установлен" : "Установить"}</button></div>
+  </div>`;
+}
+
+function instCard([slug, title, kind, version, desc, color]) {
+  return `<div class="inst">
+    <div class="mod-icon small" style="background:${color}22;color:${color}">${initials(title)}</div>
+    <div class="inst-body">
+      <div class="inst-title">${title}</div>
+      <div class="inst-meta">${kind} · ${version}</div>
+      <div class="inst-desc">${desc}</div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn small" disabled>Выключить</button>
+        <button class="btn small" disabled>Удалить</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function msgHtml(msg) {
+  const reacts = (msg.reacts || []).map(([emoji, count]) =>
+    `<button class="react" disabled>${emoji} ${count}</button>`).join("");
+  return `<div class="msg">
+    <div class="msg-avatar" style="color:var(--accent)">${initials(msg.author)}</div>
+    <div class="msg-body">
+      <div class="msg-top">
+        <span class="msg-author">${msg.author}</span>
+        <span class="msg-time">${msg.time}</span>
+        ${msg.edited ? '<span class="msg-edited">изменено</span>' : ""}
+        ${msg.mine ? '<button class="btn small" disabled style="height:22px;padding:2px 8px;font-size:10px">Изменить</button>' : ""}
+        ${msg.mine ? '<button class="btn small" disabled style="height:22px;padding:2px 8px;font-size:10px">Удалить</button>' : ""}
+      </div>
+      <div class="msg-text">${msg.text}</div>
+      ${msg.image ? `<div class="msg-image">${msg.image}</div>` : ""}
+      <div class="reacts">
+        <button class="react" disabled>👍</button>
+        <button class="react" disabled>❤️</button>
+        <button class="react" disabled>🔥</button>
+        <button class="react" disabled>😄</button>
+        <button class="react" disabled>😢</button>
+        ${reacts}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderChat() {
+  const key = state.peer ? "dm" : state.room;
+  const list = state.peer ? (CHATS.dm[state.peer] || []) : CHATS[key];
+  $("#chatList").innerHTML = list.map(msgHtml).join("");
+  const title = state.peer ? "Личные · " + state.peer
+    : state.room === "announcements" ? "Объявления"
+    : state.room === "news" ? "Новости" : "Общий чат";
+  $("#chatTitle").textContent = title;
+  const readOnly = state.room === "news" && !state.peer;
+  $("#chatReadNote").hidden = !readOnly;
+  $("#chatReadNote").textContent = "Новости публикует только Danipro914.";
+  $("#composerRow").style.display = readOnly ? "none" : "grid";
+  $("#chatInput").placeholder = "Сообщение в «" + title + "»";
+  const feed = document.querySelector(".chat-feed");
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+function showView(id) {
+  state.view = id;
+  const meta = VIEW_META[id] || VIEW_META.play;
+  $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === id));
+  $$(".view").forEach((s) => s.classList.toggle("active", s.id === "view-" + id));
+  $("#viewTitle").textContent = meta[0];
+  $("#viewSub").textContent = meta[1];
+  document.querySelector(".app").classList.toggle("compact", id === "chat");
+  if (id === "chat") {
+    renderChat();
+    $("#chatBadge").hidden = true;
+  }
+  if (id === "skin") drawSkin();
+}
+
+function drawSkin() {
+  const canvas = $("#skinCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const bg = ctx.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, "#1b2230");
+  bg.addColorStop(1, "#0d1017");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  const cx = w / 2;
+  const slim = $("#skinModel").value === "slim";
+  const armW = slim ? 9 : 13;
+  ctx.fillStyle = "#2f6fd0";
+  ctx.fillRect(cx - 17, 96, 34, 40);
+  ctx.fillStyle = "#8a5a3b";
+  ctx.fillRect(cx - 17 - armW, 96, armW, 38);
+  ctx.fillRect(cx + 17, 96, armW, 38);
+  ctx.fillStyle = "#24406b";
+  ctx.fillRect(cx - 17, 136, 14, 34);
+  ctx.fillRect(cx + 3, 136, 14, 34);
+  ctx.fillStyle = "#e0b089";
+  ctx.fillRect(cx - 27, 48, 54, 50);
+  ctx.fillStyle = "#2b2118";
+  ctx.fillRect(cx - 27, 48, 54, 11);
+  ctx.fillStyle = "#1f2937";
+  ctx.fillRect(cx - 14, 73, 9, 5);
+  ctx.fillRect(cx + 5, 73, 9, 5);
+}
+
+function boot() {
+  applyTheme("dark");
+
+  THEMES.forEach((tile) => {
+    const btn = document.createElement("button");
+    btn.dataset.theme = tile[0];
+    btn.textContent = tile[1];
+    $("#themeTiles").appendChild(btn);
+  });
+
+  $("#modResults").innerHTML = CATALOG.mod.map(modCard).join("");
+  $("#installedList").innerHTML = INSTALLED.map(instCard).join("");
+  renderChat();
+  drawSkin();
+
+  $$("#nav button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target.closest("#themeTiles button")) {
+      applyTheme(target.closest("#themeTiles button").dataset.theme);
+      return;
+    }
+    if (target.closest("#themeToggle")) {
+      const index = THEMES.findIndex((t) => t[0] === state.theme);
+      applyTheme(THEMES[(index + 1) % THEMES.length][0]);
+      return;
+    }
+    const kind = target.closest("#kindTabs button");
+    if (kind) {
+      $$("#kindTabs button").forEach((b) => b.classList.remove("active"));
+      kind.classList.add("active");
+      const list = CATALOG[kind.dataset.kind] || CATALOG.mod;
+      $("#modResults").innerHTML = list.map(modCard).join("");
+      $("#modFilter").textContent = "Показано " + list.length + " " +
+        (kind.dataset.kind === "mod" ? "модов" : kind.dataset.kind === "shader" ? "шейдеров" : "ресурспаков") +
+        " под текущую версию";
+      return;
+    }
+    const filter = target.closest("#installedTabs button[data-filter], #view-installed .tabs button[data-filter]");
+    if (filter) {
+      $$("#view-installed .tabs button").forEach((b) => b.classList.remove("active"));
+      filter.classList.add("active");
+      const f = filter.dataset.filter;
+      const rows = f === "all" ? INSTALLED : INSTALLED.filter((r) => r[2] === f);
+      $("#installedList").innerHTML = rows.map(instCard).join("");
+      return;
+    }
+    const room = target.closest("#rooms li");
+    if (room) {
+      state.peer = "";
+      state.room = room.dataset.room;
+      $$("#rooms li").forEach((li) => li.classList.toggle("active", li === room));
+      $$("#peers li").forEach((li) => li.classList.remove("active"));
+      renderChat();
+      return;
+    }
+    const peer = target.closest("#peers li");
+    if (peer) {
+      state.peer = peer.dataset.peer;
+      $$("#peers li").forEach((li) => li.classList.toggle("active", li === peer));
+      $$("#rooms li").forEach((li) => li.classList.remove("active"));
+      renderChat();
+      return;
+    }
+    if (target.closest("#ctClose")) {
+      $("#chatToast").hidden = true;
+      event.stopPropagation();
+      return;
+    }
+    if (target.closest("#chatToast")) {
+      $("#chatToast").hidden = true;
+      showView("chat");
+      return;
+    }
+    if (target.closest("button[disabled]")) {
+      event.preventDefault();
+      toast("Демо-версия: запуск, установка и чат отключены");
+      return;
+    }
+  });
+
+  $("#skinModel").addEventListener("change", drawSkin);
+  $("#chatInput").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (!state.peer && state.room === "news") return;
+    toast("Демо-версия: чат работает только в настоящем лаунчере");
+  });
+}
+
+document.addEventListener("DOMContentLoaded", boot);
+
+</script>
+</body>
+</html>
