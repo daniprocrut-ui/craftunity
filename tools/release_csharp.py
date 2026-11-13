@@ -76,6 +76,21 @@ def repo_slug(explicit: str | None) -> str:
     return match.group(1)
 
 
+def sync_backend() -> None:
+    """Кладёт свежий Python-бэкенд в дистрибутив: publish его не обновляет."""
+    for name in ("craftunity", "ui"):
+        source = ROOT / name
+        target = APP_DIR / name
+        if not source.is_dir():
+            continue
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+        shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    runner = ROOT / "run.py"
+    if runner.exists():
+        shutil.copy2(runner, APP_DIR / "run.py")
+
+
 def build_app() -> None:
     run(
         [
@@ -96,6 +111,7 @@ def build_app() -> None:
     stub = APP_DIR / "CraftunityLauncher.pdb"
     if stub.exists():
         stub.unlink()
+    sync_backend()
 
 
 def build_setup(version: str) -> Path:
@@ -232,7 +248,10 @@ def main() -> int:
     size = setup.stat().st_size
     print(f"установщик: {size} байт, sha256 {digest}")
 
-    mirror = stage_setup(version, setup)
+    stage_setup(version, setup)
+    # Зеркало на GitHub Pages не публикуется: exe в docs/launcher исключены из git,
+    # поэтому в манифесте оставляем только ссылку на артефакт релиза.
+    mirror = ""
     url = release_asset_url(repo, version)
     if not args.no_upload:
         upload(repo, version, setup, args.notes)
