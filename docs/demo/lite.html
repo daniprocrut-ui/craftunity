@@ -501,7 +501,7 @@ input[readonly] { opacity: .8; }
     <div class="topbar">
       <div>
         <h1 id="viewTitle">Играть</h1>
-        <div class="sub" id="viewSub">Craftunity — один клиент, один сервер</div>
+        <div class="sub" id="viewSub">Craftunity — один лаунчер, один сервер</div>
       </div>
       <div class="topbar-actions">
         <a class="btn ghost small" id="backLink" href="../index.html" title="Вернуться на сайт">← Назад</a>
@@ -525,9 +525,9 @@ input[readonly] { opacity: .8; }
             </div>
             <div class="play-row">
               <button class="btn primary" disabled>Играть</button>
-              <span class="hint">Клиент обновится автоматически</span>
+              <span class="hint">Лаунчер обновится автоматически</span>
             </div>
-            <div class="warn">Версия сверена с сервером сборки: 1.20.1 · Fabric. Клиент обновится при запуске.</div>
+            <div class="warn">Версия сверена с сервером сборки: 1.20.1 · Fabric. Лаунчер обновится при запуске.</div>
             <div class="progress"><div class="bar"><i style="width:38%"></i></div>
               <div class="meta"><span>Проверка файлов</span><span>38%</span></div></div>
             <div class="actions">
@@ -543,10 +543,10 @@ input[readonly] { opacity: .8; }
               <button class="btn small" disabled>Скопировать IP</button>
             </div>
             <div class="card">
-              <h3>Состояние клиента</h3>
+              <h3>Состояние лаунчера</h3>
               <div class="state-list">
                 <div class="state-row"><b>Манифест</b><span>сборка 1.20.1</span></div>
-                <div class="state-row"><b>Клиент</b><span>версия не проверена</span></div>
+                <div class="state-row"><b>Лаунчер</b><span>версия не проверена</span></div>
                 <div class="state-row"><b>Java</b><span>jdk-17 · найдена</span></div>
                 <div class="state-row"><b>Папка игры</b><span>~/.craftunity</span></div>
               </div>
@@ -719,7 +719,7 @@ input[readonly] { opacity: .8; }
             <h3>Игра</h3>
             <label class="lbl">Память (МБ)</label><input type="text" value="4096">
             <label class="lbl">Java</label><input type="text" value="C:\Program Files\Java\jdk-17\bin\java.exe">
-            <label class="lbl">Версия клиента (задаётся админ-панелью)</label><input type="text" value="1.20.1 · Fabric" readonly>
+            <label class="lbl">Версия лаунчера (задаётся админ-панелью)</label><input type="text" value="1.20.1 · Fabric" readonly>
             <label class="lbl">Адрес сервера</label><input type="text" value="craftunity.mcsh.io:25565" readonly>
             <div class="actions"><button class="btn primary" disabled>Сохранить</button><button class="btn" disabled>Папка игры</button><button class="btn" disabled>Логи</button></div>
           </div>
@@ -749,7 +749,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const VIEW_META = {
-  play: ["Играть", "Craftunity — один клиент, один сервер"],
+  play: ["Играть", "Craftunity — один лаунчер, один сервер"],
   mods: ["Контент", "Моды, ресурспаки и шейдеры с установкой в один клик"],
   installed: ["Установлено", "Ваши моды, ресурспаки и шейдеры"],
   files: ["Файлы", "Свои файлы в папке игры"],

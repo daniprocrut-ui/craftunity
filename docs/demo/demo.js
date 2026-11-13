@@ -2,7 +2,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const VIEW_META = {
-  play: ["Играть", "Craftunity — один клиент, один сервер"],
+  play: ["Играть", "Craftunity — один лаунчер, один сервер"],
   mods: ["Контент", "Моды, ресурспаки и шейдеры с установкой в один клик"],
   installed: ["Установлено", "Ваши моды, ресурспаки и шейдеры"],
   files: ["Файлы", "Свои файлы в папке игры"],
