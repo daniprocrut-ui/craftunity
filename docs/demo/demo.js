@@ -169,9 +169,19 @@ function instCard([slug, title, kind, version, desc, color]) {
   </div>`;
 }
 
-function msgHtml(msg) {
-  const reacts = (msg.reacts || []).map(([emoji, count]) =>
-    `<button class="react" disabled>${emoji} ${count}</button>`).join("");
+const REACTION_COLORS = {
+  "👍": "#38BDF8", "❤️": "#F472B6", "🔥": "#FB923C", "😄": "#FACC15",
+  "😢": "#60A5FA", "😂": "#FDE047", "😮": "#A78BFA", "😡": "#EF4444",
+  "🎉": "#34D399", "💯": "#22D3EE", "👌": "#4ADE80", "🤔": "#C084FC",
+  "😎": "#FBBF24", "🥳": "#F472B6", "💀": "#E5E7EB", "🤝": "#2DD4BF",
+};
+const REACTION_PALETTE = Object.keys(REACTION_COLORS);
+
+function msgHtml(msg, index) {
+  const reacts = (msg.reacts || []).map(([emoji, count]) => {
+    const color = REACTION_COLORS[emoji] || "#EEF1F5";
+    return `<button class="react chip" style="color:${color};border-color:${color}66">${emoji} ${count}</button>`;
+  }).join("");
   return `<div class="msg">
     <div class="msg-avatar" style="color:var(--accent)">${initials(msg.author)}</div>
     <div class="msg-body">
@@ -181,17 +191,13 @@ function msgHtml(msg) {
         ${msg.edited ? '<span class="msg-edited">изменено</span>' : ""}
         ${msg.mine ? '<button class="btn small" disabled style="height:22px;padding:2px 8px;font-size:10px">Изменить</button>' : ""}
         ${msg.mine ? '<button class="btn small" disabled style="height:22px;padding:2px 8px;font-size:10px">Удалить</button>' : ""}
+        <button class="btn small demo-reply" style="height:22px;padding:2px 8px;font-size:10px">Ответить</button>
+        <button class="btn small demo-react" data-msg="${index}" style="height:22px;padding:2px 8px;font-size:10px">🙂+</button>
       </div>
+      ${msg.reply ? `<div class="msg-quote">↩ ${msg.reply}</div>` : ""}
       <div class="msg-text">${msg.text}</div>
       ${msg.image ? `<div class="msg-image">${msg.image}</div>` : ""}
-      <div class="reacts">
-        <button class="react" disabled>👍</button>
-        <button class="react" disabled>❤️</button>
-        <button class="react" disabled>🔥</button>
-        <button class="react" disabled>😄</button>
-        <button class="react" disabled>😢</button>
-        ${reacts}
-      </div>
+      <div class="reacts">${reacts}</div>
     </div>
   </div>`;
 }
@@ -199,7 +205,7 @@ function msgHtml(msg) {
 function renderChat() {
   const key = state.peer ? "dm" : state.room;
   const list = state.peer ? (CHATS.dm[state.peer] || []) : CHATS[key];
-  $("#chatList").innerHTML = list.map(msgHtml).join("");
+  $("#chatList").innerHTML = list.map((msg, index) => msgHtml(msg, index)).join("");
   const title = state.peer ? "Личные · " + state.peer
     : state.room === "announcements" ? "Объявления"
     : state.room === "news" ? "Новости" : "Общий чат";
@@ -211,6 +217,59 @@ function renderChat() {
   $("#chatInput").placeholder = "Сообщение в «" + title + "»";
   const feed = document.querySelector(".chat-feed");
   if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+/** Текущий список сообщений открытого чата. */
+function chatList() {
+  if (state.peer) return (CHATS.dm[state.peer] = CHATS.dm[state.peer] || []);
+  return CHATS[state.room] || (CHATS[state.room] = []);
+}
+
+/** Текст сообщения для цитаты в ответе. */
+function quoteOf(msg) {
+  const text = (msg.text || "").replace(/\s+/g, " ").trim();
+  if (!text && msg.image) return msg.author + ": картинка";
+  const short = text.length > 90 ? text.slice(0, 90) + "…" : text;
+  return msg.author + ": " + short;
+}
+
+function addReaction(msg, emoji) {
+  msg.reacts = msg.reacts || [];
+  const hit = msg.reacts.find(([e]) => e === emoji);
+  if (hit) {
+    hit[1] += 1;
+  } else {
+    msg.reacts.push([emoji, 1]);
+  }
+}
+
+/** Выпадающая панель со всеми эмодзи для конкретного сообщения. */
+function togglePalette(button, msg) {
+  const existing = document.getElementById("reactPalette");
+  if (existing) {
+    const same = existing.dataset.target === button.dataset.msg;
+    existing.remove();
+    if (same) return;
+  }
+  const box = document.createElement("div");
+  box.id = "reactPalette";
+  box.className = "react-palette";
+  box.dataset.target = button.dataset.msg;
+  REACTION_PALETTE.forEach((emoji) => {
+    const chip = document.createElement("button");
+    chip.className = "react chip";
+    chip.style.color = REACTION_COLORS[emoji];
+    chip.style.borderColor = REACTION_COLORS[emoji] + "66";
+    chip.textContent = emoji;
+    chip.addEventListener("click", (event) => {
+      event.stopPropagation();
+      addReaction(msg, emoji);
+      box.remove();
+      renderChat();
+    });
+    box.appendChild(chip);
+  });
+  button.parentElement.appendChild(box);
 }
 
 function showView(id) {
@@ -277,6 +336,30 @@ function boot() {
 
   document.addEventListener("click", (event) => {
     const target = event.target;
+    const reactBtn = target.closest(".demo-react");
+    if (reactBtn) {
+      const list = chatList();
+      const msg = list[Number(reactBtn.dataset.msg)];
+      if (msg) togglePalette(reactBtn, msg);
+      return;
+    }
+    const replyBtn = target.closest(".demo-reply");
+    if (replyBtn) {
+      const row = replyBtn.closest(".msg");
+      const all = $$("#chatList .msg");
+      const index = all.indexOf(row);
+      const msg = chatList()[index];
+      if (msg) {
+        $("#chatInput").value = "@" + msg.author + ": ";
+        $("#chatInput").focus();
+        toast("Демо: ответ цитируется как «↩ " + quoteOf(msg) + "»");
+      }
+      return;
+    }
+    if (!target.closest("#reactPalette")) {
+      const open = document.getElementById("reactPalette");
+      if (open) open.remove();
+    }
     if (target.closest("#themeTiles button")) {
       applyTheme(target.closest("#themeTiles button").dataset.theme);
       return;
@@ -345,7 +428,7 @@ function boot() {
     if (event.key !== "Enter") return;
     event.preventDefault();
     if (!state.peer && state.room === "news") return;
-    toast("Демо-версия: чат работает только в настоящем лаунчере");
+    toast("Демо-версия: отправка работает только в настоящем лаунчере");
   });
 }
 

@@ -368,7 +368,17 @@ input[readonly] { opacity: .8; }
 .room-list { margin-top: 10px; }
 .peer-list li, .room-list li {
   padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: 12.5px;
+  display: flex; align-items: center; gap: 8px;
 }
+.chat-ic {
+  width: 22px; height: 22px; border-radius: 7px;
+  display: grid; place-items: center; flex: none;
+  font-size: 11px; font-weight: 700;
+  background: var(--bg); color: var(--accent);
+}
+.chat-ic.room-general { background: #223B82F6; }
+.chat-ic.room-announcements { background: #22FBBF24; }
+.chat-ic.room-news { background: #2234D399; }
 .peer-list li:hover, .room-list li:hover { background: var(--card); }
 .room-list li.active { background: var(--card); color: var(--accent); font-weight: 600; }
 
@@ -414,6 +424,24 @@ input[readonly] { opacity: .8; }
 }
 .react.mine { border-color: var(--accent); color: var(--accent); }
 .reacts .muted { margin-left: 6px; }
+.react.chip { background: rgba(255,255,255,.04); }
+
+.msg-quote {
+  margin-top: 6px; padding: 6px 9px; border-radius: 8px;
+  background: var(--bg); border-left: 3px solid var(--accent);
+  font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.react-palette {
+  position: absolute; z-index: 40; margin-top: 30px;
+  display: grid; grid-template-columns: repeat(8, 30px); gap: 3px;
+  padding: 8px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line);
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+.react-palette .react { width: 30px; padding: 2px 0; text-align: center; font-size: 15px; }
+.msg-top { position: relative; }
 
 .composer-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; }
 .composer-row input { height: 40px; }
@@ -667,14 +695,14 @@ input[readonly] { opacity: .8; }
           <h3>Чаты</h3>
           <p class="muted small">Личные сообщения</p>
           <ul class="peer-list" id="peers">
-            <li data-peer="SonicWave">SonicWave</li>
-            <li data-peer="Panda_MC">Panda_MC</li>
-            <li data-peer="Kotik">Kotik</li>
+            <li data-peer="SonicWave"><span class="chat-ic">S</span><span>SonicWave</span></li>
+            <li data-peer="Panda_MC"><span class="chat-ic">P</span><span>Panda_MC</span></li>
+            <li data-peer="Kotik"><span class="chat-ic">K</span><span>Kotik</span></li>
           </ul>
           <ul class="room-list" id="rooms">
-            <li data-room="general" class="active">Общий чат</li>
-            <li data-room="announcements">Объявления</li>
-            <li data-room="news">Новости</li>
+            <li data-room="general" class="active"><span class="chat-ic room-general">💬</span><span>Общий чат</span></li>
+            <li data-room="announcements"><span class="chat-ic room-announcements">📢</span><span>Объявления</span></li>
+            <li data-room="news"><span class="chat-ic room-news">📰</span><span>Новости</span></li>
           </ul>
         </div>
         <div class="chat-main">
@@ -919,9 +947,19 @@ function instCard([slug, title, kind, version, desc, color]) {
   </div>`;
 }
 
-function msgHtml(msg) {
-  const reacts = (msg.reacts || []).map(([emoji, count]) =>
-    `<button class="react" disabled>${emoji} ${count}</button>`).join("");
+const REACTION_COLORS = {
+  "👍": "#38BDF8", "❤️": "#F472B6", "🔥": "#FB923C", "😄": "#FACC15",
+  "😢": "#60A5FA", "😂": "#FDE047", "😮": "#A78BFA", "😡": "#EF4444",
+  "🎉": "#34D399", "💯": "#22D3EE", "👌": "#4ADE80", "🤔": "#C084FC",
+  "😎": "#FBBF24", "🥳": "#F472B6", "💀": "#E5E7EB", "🤝": "#2DD4BF",
+};
+const REACTION_PALETTE = Object.keys(REACTION_COLORS);
+
+function msgHtml(msg, index) {
+  const reacts = (msg.reacts || []).map(([emoji, count]) => {
+    const color = REACTION_COLORS[emoji] || "#EEF1F5";
+    return `<button class="react chip" style="color:${color};border-color:${color}66">${emoji} ${count}</button>`;
+  }).join("");
   return `<div class="msg">
     <div class="msg-avatar" style="color:var(--accent)">${initials(msg.author)}</div>
     <div class="msg-body">
@@ -931,25 +969,74 @@ function msgHtml(msg) {
         ${msg.edited ? '<span class="msg-edited">изменено</span>' : ""}
         ${msg.mine ? '<button class="btn small" disabled style="height:22px;padding:2px 8px;font-size:10px">Изменить</button>' : ""}
         ${msg.mine ? '<button class="btn small" disabled style="height:22px;padding:2px 8px;font-size:10px">Удалить</button>' : ""}
+        <button class="btn small demo-reply" style="height:22px;padding:2px 8px;font-size:10px">Ответить</button>
+        <button class="btn small demo-react" data-msg="${index}" style="height:22px;padding:2px 8px;font-size:10px">🙂+</button>
       </div>
+      ${msg.reply ? `<div class="msg-quote">↩ ${msg.reply}</div>` : ""}
       <div class="msg-text">${msg.text}</div>
       ${msg.image ? `<div class="msg-image">${msg.image}</div>` : ""}
-      <div class="reacts">
-        <button class="react" disabled>👍</button>
-        <button class="react" disabled>❤️</button>
-        <button class="react" disabled>🔥</button>
-        <button class="react" disabled>😄</button>
-        <button class="react" disabled>😢</button>
-        ${reacts}
-      </div>
+      <div class="reacts">${reacts}</div>
     </div>
   </div>`;
+}
+
+/** Текущий список сообщений открытого чата. */
+function chatList() {
+  if (state.peer) return (CHATS.dm[state.peer] = CHATS.dm[state.peer] || []);
+  return CHATS[state.room] || (CHATS[state.room] = []);
+}
+
+/** Текст сообщения для цитаты в ответе. */
+function quoteOf(msg) {
+  const text = (msg.text || "").replace(/\s+/g, " ").trim();
+  if (!text && msg.image) return msg.author + ": картинка";
+  const short = text.length > 90 ? text.slice(0, 90) + "…" : text;
+  return msg.author + ": " + short;
+}
+
+function addReaction(msg, emoji) {
+  msg.reacts = msg.reacts || [];
+  const hit = msg.reacts.find(([e]) => e === emoji);
+  if (hit) {
+    hit[1] += 1;
+  } else {
+    msg.reacts.push([emoji, 1]);
+  }
+}
+
+/** Выпадающая панель со всеми эмодзи для конкретного сообщения. */
+function togglePalette(button, msg) {
+  const existing = document.getElementById("reactPalette");
+  if (existing) {
+    const same = existing.dataset.target === button.dataset.msg;
+    existing.remove();
+    if (same) return;
+  }
+  const box = document.createElement("div");
+  box.id = "reactPalette";
+  box.className = "react-palette";
+  box.dataset.target = button.dataset.msg;
+  REACTION_PALETTE.forEach((emoji) => {
+    const chip = document.createElement("button");
+    chip.className = "react chip";
+    chip.style.color = REACTION_COLORS[emoji];
+    chip.style.borderColor = REACTION_COLORS[emoji] + "66";
+    chip.textContent = emoji;
+    chip.addEventListener("click", (event) => {
+      event.stopPropagation();
+      addReaction(msg, emoji);
+      box.remove();
+      renderChat();
+    });
+    box.appendChild(chip);
+  });
+  button.parentElement.appendChild(box);
 }
 
 function renderChat() {
   const key = state.peer ? "dm" : state.room;
   const list = state.peer ? (CHATS.dm[state.peer] || []) : CHATS[key];
-  $("#chatList").innerHTML = list.map(msgHtml).join("");
+  $("#chatList").innerHTML = list.map((msg, index) => msgHtml(msg, index)).join("");
   const title = state.peer ? "Личные · " + state.peer
     : state.room === "announcements" ? "Объявления"
     : state.room === "news" ? "Новости" : "Общий чат";
@@ -1027,6 +1114,30 @@ function boot() {
 
   document.addEventListener("click", (event) => {
     const target = event.target;
+    const reactBtn = target.closest(".demo-react");
+    if (reactBtn) {
+      const list = chatList();
+      const msg = list[Number(reactBtn.dataset.msg)];
+      if (msg) togglePalette(reactBtn, msg);
+      return;
+    }
+    const replyBtn = target.closest(".demo-reply");
+    if (replyBtn) {
+      const row = replyBtn.closest(".msg");
+      const all = $$("#chatList .msg");
+      const index = all.indexOf(row);
+      const msg = chatList()[index];
+      if (msg) {
+        $("#chatInput").value = "@" + msg.author + ": ";
+        $("#chatInput").focus();
+        toast("Демо: ответ цитируется как «↩ " + quoteOf(msg) + "»");
+      }
+      return;
+    }
+    if (!target.closest("#reactPalette")) {
+      const open = document.getElementById("reactPalette");
+      if (open) open.remove();
+    }
     if (target.closest("#themeTiles button")) {
       applyTheme(target.closest("#themeTiles button").dataset.theme);
       return;

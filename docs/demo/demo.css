@@ -358,7 +358,17 @@ input[readonly] { opacity: .8; }
 .room-list { margin-top: 10px; }
 .peer-list li, .room-list li {
   padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: 12.5px;
+  display: flex; align-items: center; gap: 8px;
 }
+.chat-ic {
+  width: 22px; height: 22px; border-radius: 7px;
+  display: grid; place-items: center; flex: none;
+  font-size: 11px; font-weight: 700;
+  background: var(--bg); color: var(--accent);
+}
+.chat-ic.room-general { background: #223B82F6; }
+.chat-ic.room-announcements { background: #22FBBF24; }
+.chat-ic.room-news { background: #2234D399; }
 .peer-list li:hover, .room-list li:hover { background: var(--card); }
 .room-list li.active { background: var(--card); color: var(--accent); font-weight: 600; }
 
@@ -402,8 +412,26 @@ input[readonly] { opacity: .8; }
   border-radius: 8px; padding: 3px 8px;
   font: inherit; font-size: 11.5px; color: var(--text); cursor: pointer;
 }
+.react.chip { background: rgba(255,255,255,.04); }
 .react.mine { border-color: var(--accent); color: var(--accent); }
 .reacts .muted { margin-left: 6px; }
+
+.msg-quote {
+  margin-top: 6px; padding: 6px 9px; border-radius: 8px;
+  background: var(--bg); border-left: 3px solid var(--accent);
+  font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.react-palette {
+  position: absolute; z-index: 40; margin-top: 30px;
+  display: grid; grid-template-columns: repeat(8, 30px); gap: 3px;
+  padding: 8px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line);
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+.react-palette .react { width: 30px; padding: 2px 0; text-align: center; font-size: 15px; }
+.msg-top { position: relative; }
 
 .composer-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; }
 .composer-row input { height: 40px; }
