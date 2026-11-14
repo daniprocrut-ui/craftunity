@@ -184,6 +184,46 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
   height: 40px; padding: 10px 26px; min-width: 110px;
 }
 
+/* Кнопка «Играть» первой строки: мягкий ореол вокруг, заметный и в отключённом виде. */
+.play-row .btn.primary {
+  position: relative;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 10px 28px -6px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 46px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: play-glow 3.2s ease-in-out infinite;
+}
+
+.play-row .btn.primary::after {
+  content: "";
+  position: absolute;
+  inset: -18px -22px;
+  border-radius: 999px;
+  background: radial-gradient(60% 60% at 50% 50%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 72%);
+  filter: blur(14px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes play-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+      0 10px 28px -6px color-mix(in srgb, var(--accent) 50%, transparent),
+      0 0 38px -8px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 10px 30px -4px color-mix(in srgb, var(--accent) 65%, transparent),
+      0 0 58px -4px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-row .btn.primary { animation: none; }
+}
+
 input[type="text"], input[type="password"], select {
   background: var(--panel);
   color: var(--text);
@@ -431,9 +471,9 @@ input[readonly] { opacity: .8; }
   border-radius: 8px; padding: 3px 8px;
   font: inherit; font-size: 11.5px; color: var(--text); cursor: pointer;
 }
+.react.chip { background: rgba(255,255,255,.04); }
 .react.mine { border-color: var(--accent); color: var(--accent); }
 .reacts .muted { margin-left: 6px; }
-.react.chip { background: rgba(255,255,255,.04); }
 
 .msg-quote {
   margin-top: 6px; padding: 6px 9px; border-radius: 8px;
@@ -499,6 +539,18 @@ input[readonly] { opacity: .8; }
   .chat-view.active { grid-template-columns: 1fr; }
   .toolbar { grid-template-columns: 1fr 1fr; }
 }
+
+.peer-list li { position: relative; }
+.peer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peer-remove {
+  flex: none; width: 18px; height: 18px; padding: 0; border: none; border-radius: 6px;
+  background: transparent; color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+.peer-list li:hover .peer-remove { opacity: 1; }
+.peer-remove:hover { background: #EF444422; color: #EF4444; }
+
+
 
 .view:not(.active){display:none}
 </style>
@@ -703,7 +755,11 @@ input[readonly] { opacity: .8; }
         <div class="card chat-side">
           <h3>Чаты</h3>
           <p class="muted small">Личные сообщения</p>
-          <ul class="peer-list" id="peers"></ul>
+          <ul class="peer-list" id="peers">
+            <li data-peer="SonicWave"><span class="chat-ic">S</span><span>SonicWave</span></li>
+            <li data-peer="Panda_MC"><span class="chat-ic">P</span><span>Panda_MC</span></li>
+            <li data-peer="Kotik"><span class="chat-ic">K</span><span>Kotik</span></li>
+          </ul>
           <ul class="room-list" id="rooms">
             <li data-room="general" class="active"><span class="chat-ic room-general">💬</span><span>Общий чат</span></li>
             <li data-room="announcements"><span class="chat-ic room-announcements">📢</span><span>Объявления</span></li>
@@ -861,12 +917,12 @@ const CHATS = {
   general: [
     { author: "SonicWave", mine: false, time: "14:02", text: "Кто-нибудь ставил новый шейдер? На 1.20.1 очень бодро.", reacts: [["👍", 3], ["🔥", 1]] },
     { author: "Panda_MC", mine: false, time: "14:05", text: "Да, поставил Complementary через вкладку Контент. Всё в один клик.", image: "скриншот · 1280×720", reacts: [["👍", 5]] },
-    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.41 — реакции на сообщения и ответы.", reacts: [["❤️", 2], ["😄", 1]] },
+    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.40 — реакции на сообщения и ответы.", reacts: [["❤️", 2], ["😄", 1]] },
     { author: "Kotik", mine: false, time: "14:11", text: "У меня клиент скачался, но Java качается второй раз.", edited: true, reacts: [] },
     { author: "Danipro914", mine: true, time: "14:12", text: "Это кэш Java: во вкладке Настройки выключи «Автоматически скачивать Java», если 17 уже стоит.", reacts: [["👍", 1]] },
   ],
   announcements: [
-    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.41: цветные реакции, ответы на сообщения, иконки чатов.", reacts: [["🔥", 7], ["👍", 4]] },
+    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.40: цветные реакции, ответы на сообщения, иконки чатов.", reacts: [["🔥", 7], ["👍", 4]] },
     { author: "Danipro914", mine: true, time: "13:40", text: "Сервер переключён на 1.20.1 · Fabric. Все моды подтянутся автоматически.", reacts: [["👍", 3]] },
   ],
   news: [
@@ -904,9 +960,9 @@ function peerList() {
 
 /** Статус игрока: в игре, только в лаунчере или не в сети. */
 const PRESENCE = {
-  "SonicWave": "in_game",
-  "Panda_MC": "launcher",
-  "Kotik": "offline",
+  SonicWave: "in_game",
+  Panda_MC: "launcher",
+  Kotik: "offline",
 };
 
 function presenceOf(name) {
@@ -925,6 +981,7 @@ function renderPeers() {
     </li>`)
     .join("");
 }
+
 
 function initials(name) {
   return (name || "?").replace(/[^A-Za-zА-Яа-я0-9]/g, "").slice(0, 1).toUpperCase();
@@ -1030,6 +1087,23 @@ function msgHtml(msg, index) {
   </div>`;
 }
 
+function renderChat() {
+  const key = state.peer ? "dm" : state.room;
+  const list = state.peer ? (CHATS.dm[state.peer] || []) : CHATS[key];
+  $("#chatList").innerHTML = list.map((msg, index) => msgHtml(msg, index)).join("");
+  const title = state.peer ? "Личные · " + state.peer
+    : state.room === "announcements" ? "Объявления"
+    : state.room === "news" ? "Новости" : "Общий чат";
+  $("#chatTitle").textContent = title;
+  const readOnly = state.room === "news" && !state.peer;
+  $("#chatReadNote").hidden = !readOnly;
+  $("#chatReadNote").textContent = "Новости публикует только Danipro914.";
+  $("#composerRow").style.display = readOnly ? "none" : "grid";
+  $("#chatInput").placeholder = "Сообщение в «" + title + "»";
+  const feed = document.querySelector(".chat-feed");
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
 /** Текущий список сообщений открытого чата. */
 function chatList() {
   if (state.peer) return (CHATS.dm[state.peer] = CHATS.dm[state.peer] || []);
@@ -1081,23 +1155,6 @@ function togglePalette(button, msg) {
     box.appendChild(chip);
   });
   button.parentElement.appendChild(box);
-}
-
-function renderChat() {
-  const key = state.peer ? "dm" : state.room;
-  const list = state.peer ? (CHATS.dm[state.peer] || []) : CHATS[key];
-  $("#chatList").innerHTML = list.map((msg, index) => msgHtml(msg, index)).join("");
-  const title = state.peer ? "Личные · " + state.peer
-    : state.room === "announcements" ? "Объявления"
-    : state.room === "news" ? "Новости" : "Общий чат";
-  $("#chatTitle").textContent = title;
-  const readOnly = state.room === "news" && !state.peer;
-  $("#chatReadNote").hidden = !readOnly;
-  $("#chatReadNote").textContent = "Новости публикует только Danipro914.";
-  $("#composerRow").style.display = readOnly ? "none" : "grid";
-  $("#chatInput").placeholder = "Сообщение в «" + title + "»";
-  const feed = document.querySelector(".chat-feed");
-  if (feed) feed.scrollTop = feed.scrollHeight;
 }
 
 function showView(id) {
@@ -1276,7 +1333,7 @@ function boot() {
     if (event.key !== "Enter") return;
     event.preventDefault();
     if (!state.peer && state.room === "news") return;
-    toast("Демо-версия: чат работает только в настоящем лаунчере");
+    toast("Демо-версия: отправка работает только в настоящем лаунчере");
   });
 }
 

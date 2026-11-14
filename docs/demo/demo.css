@@ -174,6 +174,46 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
   height: 40px; padding: 10px 26px; min-width: 110px;
 }
 
+/* Кнопка «Играть» первой строки: мягкий ореол вокруг, заметный и в отключённом виде. */
+.play-row .btn.primary {
+  position: relative;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 10px 28px -6px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 46px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: play-glow 3.2s ease-in-out infinite;
+}
+
+.play-row .btn.primary::after {
+  content: "";
+  position: absolute;
+  inset: -18px -22px;
+  border-radius: 999px;
+  background: radial-gradient(60% 60% at 50% 50%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 72%);
+  filter: blur(14px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes play-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+      0 10px 28px -6px color-mix(in srgb, var(--accent) 50%, transparent),
+      0 0 38px -8px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 10px 30px -4px color-mix(in srgb, var(--accent) 65%, transparent),
+      0 0 58px -4px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-row .btn.primary { animation: none; }
+}
+
 input[type="text"], input[type="password"], select {
   background: var(--panel);
   color: var(--text);
