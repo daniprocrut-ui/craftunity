@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CraftunityLauncher"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Craftunity Launcher"
         MinHeight="560" MinWidth="860"
         Width="1180" Height="760"
@@ -11,7 +12,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="208"/>
+            <ColumnDefinition x:Name="SideColumn" Width="208"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -30,7 +31,7 @@
                         <TextBlock Text="C" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AccentFgBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <StackPanel Margin="10,0,0,0">
+                    <StackPanel x:Name="SideBrand" Margin="10,0,0,0">
                         <TextBlock Text="CRAFTUNITY" FontWeight="Bold" FontSize="13"/>
                         <TextBlock Text="LAUNCHER" Style="{StaticResource Muted}" FontSize="10"/>
                     </StackPanel>
@@ -38,15 +39,15 @@
 
                 <ListBox x:Name="Nav" Grid.Row="1" Background="Transparent" BorderThickness="0"
                          ItemContainerStyle="{StaticResource NavItemStyle}" SelectionChanged="OnNavChanged">
-                    <ListBoxItem Content="▶  Играть"/>
-                    <ListBoxItem Content="◀  Контент"/>
-                    <ListBoxItem Content="▣  Установлено"/>
-                    <ListBoxItem Content="▤  Файлы"/>
-                    <ListBoxItem Content="☻  Скин"/>
-                    <ListBoxItem Content="◉  Аккаунт"/>
+                    <ListBoxItem x:Name="NavPlay" Content="▶  Играть"/>
+                    <ListBoxItem x:Name="NavContent" Content="◀  Контент"/>
+                    <ListBoxItem x:Name="NavInstalled" Content="▣  Установлено"/>
+                    <ListBoxItem x:Name="NavFiles" Content="▤  Файлы"/>
+                    <ListBoxItem x:Name="NavSkin" Content="☻  Скин"/>
+                    <ListBoxItem x:Name="NavAccount" Content="◉  Аккаунт"/>
                     <ListBoxItem>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="✉  Чат" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="NavChatText" Text="✉  Чат" VerticalAlignment="Center"/>
                             <Border x:Name="ChatBadge" Margin="8,0,0,0" Padding="6,1" CornerRadius="8"
                                     Background="{DynamicResource DangerBrush}" VerticalAlignment="Center"
                                     Visibility="Collapsed">
@@ -55,7 +56,8 @@
                             </Border>
                         </StackPanel>
                     </ListBoxItem>
-                    <ListBoxItem Content="⚙  Настройки"/>
+                    <ListBoxItem x:Name="NavSettings" Content="⚙  Настройки"/>
+                    <ListBoxItem x:Name="NavMap" Content="🗺  Карта"/>
                 </ListBox>
 
                 <StackPanel Grid.Row="2">
@@ -123,10 +125,19 @@
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <Border Width="96" Height="96" CornerRadius="18" Background="{DynamicResource BgBrush}" ClipToBounds="True">
-                                            <Border CornerRadius="18" Background="{DynamicResource BgBrush}">
-                                                <Image x:Name="AvatarImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
-                                            </Border>
+                                        <Border Width="96" Height="96" CornerRadius="18" Background="{DynamicResource BgBrush}"
+                                                ClipToBounds="True">
+                                            <Image x:Name="AvatarImage" Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                                <Image.OpacityMask>
+                                                    <VisualBrush>
+                                                        <VisualBrush.Visual>
+                                                            <Border Width="96" Height="96" CornerRadius="18"
+                                                                    Background="White"/>
+                                                        </VisualBrush.Visual>
+                                                    </VisualBrush>
+                                                </Image.OpacityMask>
+                                            </Image>
                                         </Border>
                                         <StackPanel Margin="16,4,0,0">
                                             <TextBlock x:Name="HeroName" Text="Гость" FontSize="24" FontWeight="SemiBold"/>
@@ -246,7 +257,16 @@
                                             <Border Width="96" Height="96" CornerRadius="22"
                                                     Background="{DynamicResource BgBrush}" ClipToBounds="True"
                                                     HorizontalAlignment="Center">
-                                                <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
+                                                <Image Source="{Binding IconUrl}" Stretch="UniformToFill">
+                                                    <Image.OpacityMask>
+                                                        <VisualBrush>
+                                                            <VisualBrush.Visual>
+                                                                <Border Width="96" Height="96" CornerRadius="22"
+                                                                        Background="White"/>
+                                                            </VisualBrush.Visual>
+                                                        </VisualBrush>
+                                                    </Image.OpacityMask>
+                                                </Image>
                                             </Border>
                                             <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
                                                        Margin="0,10,0,0" HorizontalAlignment="Center"
@@ -293,7 +313,16 @@
                                             Background="{DynamicResource BgBrush}" ClipToBounds="True"
                                             Margin="0,0,16,0" VerticalAlignment="Top">
                                         <Image x:Name="ProjectIcon" Stretch="UniformToFill"
-                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                               RenderOptions.BitmapScalingMode="HighQuality">
+                                            <Image.OpacityMask>
+                                                <VisualBrush>
+                                                    <VisualBrush.Visual>
+                                                        <Border Width="96" Height="96" CornerRadius="20"
+                                                                Background="White"/>
+                                                    </VisualBrush.Visual>
+                                                </VisualBrush>
+                                            </Image.OpacityMask>
+                                        </Image>
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
                                         <TextBlock x:Name="ProjectTitle" FontSize="18" FontWeight="SemiBold"/>
@@ -357,7 +386,16 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <Border Width="56" Height="56" CornerRadius="16"
                                                         Background="{DynamicResource BgBrush}" ClipToBounds="True">
-                                                    <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
+                                                    <Image Source="{Binding IconUrl}" Stretch="UniformToFill">
+                                                        <Image.OpacityMask>
+                                                            <VisualBrush>
+                                                                <VisualBrush.Visual>
+                                                                    <Border Width="56" Height="56" CornerRadius="16"
+                                                                            Background="White"/>
+                                                                </VisualBrush.Visual>
+                                                            </VisualBrush>
+                                                        </Image.OpacityMask>
+                                                    </Image>
                                                 </Border>
                                                 <StackPanel Margin="12,0,0,0" Width="200">
                                                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13.5"
@@ -434,9 +472,19 @@
                                 <TextBlock Text="Ваш скин" Style="{StaticResource H2}"/>
                                 <TextBlock Text="PNG 64×64 (или 64×32)." Style="{StaticResource Muted}" Margin="0,6,0,0"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                                    <Border Width="160" Height="160" CornerRadius="18" Background="{DynamicResource BgBrush}">
+                                    <Border Width="160" Height="160" CornerRadius="18" Background="{DynamicResource BgBrush}"
+                                            ClipToBounds="True">
                                         <Image x:Name="SkinImage" Stretch="Uniform"
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor">
+                                            <Image.OpacityMask>
+                                                <VisualBrush>
+                                                    <VisualBrush.Visual>
+                                                        <Border Width="160" Height="160" CornerRadius="18"
+                                                                Background="White"/>
+                                                    </VisualBrush.Visual>
+                                                </VisualBrush>
+                                            </Image.OpacityMask>
+                                        </Image>
                                     </Border>
                                     <StackPanel Margin="16,0,0,0">
                                         <TextBlock Text="Модель" Style="{StaticResource Muted}" Margin="0,0,0,4"/>
@@ -506,97 +554,311 @@
                     <!-- ЧАТ -->
                     <Grid x:Name="PageChat" Visibility="Collapsed" VerticalAlignment="Stretch"
                           Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="230"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Чаты" Style="{StaticResource H2}"
+                                           Margin="0,0,0,10"/>
+                                <TextBlock DockPanel.Dock="Top" Text="Личные сообщения" Style="{StaticResource Muted}"
+                                           Margin="0,10,0,4"/>
+                                <ListBox x:Name="ChatPeers" DockPanel.Dock="Top" Height="170" Background="Transparent"
+                                         BorderThickness="0" SelectionChanged="OnChatPeerChanged">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                    <Grid Width="22" Height="22" Margin="0,0,8,0">
+                                                        <Border Width="22" Height="22" CornerRadius="7"
+                                                                Background="{DynamicResource BgBrush}">
+                                                            <Border.Clip>
+                                                                <RectangleGeometry Rect="0,0,22,22" RadiusX="7" RadiusY="7"/>
+                                                            </Border.Clip>
+                                                            <Image Source="{Binding Icon}" Stretch="UniformToFill"
+                                                                   RenderOptions.BitmapScalingMode="Fant"/>
+                                                        </Border>
+                                                        <Ellipse Width="9" Height="9" HorizontalAlignment="Right"
+                                                                 VerticalAlignment="Bottom" Margin="0,0,-2,-2"
+                                                                 Fill="{Binding StatusColor}"
+                                                                 Stroke="{DynamicResource PanelBrush}" StrokeThickness="2"
+                                                                 ToolTip="{Binding StatusText}"/>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="✕" Tag="{Binding}"
+                                                        Click="OnPeerRemoveClick" Width="18" Height="18"
+                                                        Padding="0" FontSize="10" Margin="6,0,0,0"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Foreground="{DynamicResource MutedBrush}"
+                                                        Cursor="Hand" ToolTip="Убрать личный чат"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <ListBox x:Name="ChatRooms" Background="Transparent" BorderThickness="0"
+                                         SelectionChanged="OnChatRoomChanged">
+                                    <ListBoxItem Tag="general">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Width="22" Height="22" CornerRadius="7" Margin="0,0,8,0"
+                                                    Background="#223B82F6">
+                                                <TextBlock Text="💬" FontSize="12" HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Общий чат" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ListBoxItem>
+                                    <ListBoxItem Tag="announcements">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Width="22" Height="22" CornerRadius="7" Margin="0,0,8,0"
+                                                    Background="#22FBBF24">
+                                                <TextBlock Text="📢" FontSize="12" HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Объявления" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ListBoxItem>
+                                    <ListBoxItem Tag="news">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Width="22" Height="22" CornerRadius="7" Margin="0,0,8,0"
+                                                    Background="#2234D399">
+                                                <TextBlock Text="📰" FontSize="12" HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="Новости" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </ListBoxItem>
+                                </ListBox>
+                            </DockPanel>
+                        </Border>
+
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="ChatTitle" Text="Общий чат" Style="{StaticResource H2}"
+                                               VerticalAlignment="Center"/>
+                                    <Button Content="Обновить" Click="OnChatRefreshClick" Margin="16,0,0,0"
+                                            Padding="14,6" FontSize="12"/>
+                                    <TextBlock x:Name="ChatState" Style="{StaticResource Muted}"
+                                               VerticalAlignment="Center" Margin="14,0,0,0" Text="Загрузка…"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
+                                <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              CanContentScroll="False" Padding="0,0,8,0"
+                                              PanningMode="VerticalOnly">
+                                    <ItemsControl x:Name="ChatList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,10" Padding="12,10"
+                                                        Background="{DynamicResource PanelBrush}"
+                                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+                                                        CornerRadius="12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="12"
+                                                                Background="{DynamicResource BgBrush}"
+                                                                Margin="0,0,10,0" VerticalAlignment="Top">
+                                                            <Border.Clip>
+                                                                <RectangleGeometry Rect="0,0,36,36" RadiusX="12" RadiusY="12"/>
+                                                            </Border.Clip>
+                                                            <Image Source="{Binding Avatar}" Stretch="UniformToFill"
+                                                                   RenderOptions.BitmapScalingMode="Fant"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Author}" FontWeight="SemiBold"
+                                                                           FontSize="13" Cursor="Hand"
+                                                                           ToolTip="Открыть личные сообщения"
+                                                                           Tag="{Binding}" MouseLeftButtonUp="OnChatAuthorClick"/>
+                                                                <TextBlock Text="{Binding TimeLabel}" FontSize="11"
+                                                                           Margin="10,2,0,0"
+                                                                           Foreground="{DynamicResource MutedBrush}"/>
+                                                                <TextBlock Text="изменено" FontSize="10" Margin="8,3,0,0"
+                                                                           Foreground="{DynamicResource MutedBrush}"
+                                                                           Visibility="{Binding Edited, Converter={StaticResource BoolToVisibility}}"/>
+                                                                <Button Content="Изменить" Tag="{Binding}" Click="OnChatEditClick"
+                                                                        Margin="10,0,0,0" Padding="8,2" FontSize="10"
+                                                                        Visibility="{Binding Mine, Converter={StaticResource BoolToVisibility}}"/>
+                                                                <Button Content="Удалить" Tag="{Binding}" Click="OnChatDeleteClick"
+                                                                        Margin="6,0,0,0" Padding="8,2" FontSize="10"
+                                                                        Visibility="{Binding Mine, Converter={StaticResource BoolToVisibility}}"/>
+                                                                <Button Content="Ответить" Tag="{Binding}" Click="OnChatReplyClick"
+                                                                        Margin="6,0,0,0" Padding="8,2" FontSize="10"/>
+                                                                <Button Content="🙂+" Tag="{Binding}" Click="OnChatReactMenuClick"
+                                                                        Margin="6,0,0,0" Padding="8,2" FontSize="10"
+                                                                        ToolTip="Выбрать реакцию"/>
+                                                            </StackPanel>
+                                                            <Border Margin="0,6,0,0" Padding="8,4" CornerRadius="8"
+                                                                    Background="{DynamicResource BgBrush}"
+                                                                    BorderBrush="{DynamicResource AccentBrush}"
+                                                                    BorderThickness="2,0,0,0"
+                                                                    Visibility="{Binding HasReply, Converter={StaticResource BoolToVisibility}}">
+                                                                <TextBlock Text="{Binding ReplyToText}" FontSize="11"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Foreground="{DynamicResource MutedBrush}"/>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Text}" FontSize="13" Margin="0,4,0,0"
+                                                                       TextWrapping="Wrap"/>
+                                                            <Border Margin="0,8,0,0" MaxWidth="360"
+                                                                    HorizontalAlignment="Left" CornerRadius="10"
+                                                                    Background="{DynamicResource BgBrush}"
+                                                                    Padding="0"
+                                                                    Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}">
+                                                                <Image Source="{Binding Image}" MaxWidth="360" MaxHeight="280"
+                                                                       HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                                       Stretch="Uniform"
+                                                                       RenderOptions.BitmapScalingMode="Fant"/>
+                                                            </Border>
+                                                            <WrapPanel x:Name="ReactionChips" Orientation="Horizontal" Margin="0,6,0,0">
+                                                                <WrapPanel.Style>
+                                                                    <Style TargetType="WrapPanel">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding HasReply}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </WrapPanel.Style>
+                                                            </WrapPanel>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                                <Button Content="🙂+" Tag="{Binding}" Click="OnChatReactMenuClick"
+                                                                        Padding="8,2" FontSize="11" Margin="0,0,4,0"
+                                                                        ToolTip="Выбрать реакцию"/>
+                                                                <TextBlock Text="{Binding ReactionsLabel}" FontSize="11"
+                                                                           VerticalAlignment="Center" Margin="6,0,0,0"
+                                                                           Foreground="{DynamicResource MutedBrush}"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+
+                            <StackPanel Grid.Row="2">
+                                <TextBlock x:Name="ChatReadOnlyNote" Visibility="Collapsed"
+                                           Text="Этот чат только для чтения."
+                                           Style="{StaticResource Muted}" Margin="0,0,0,8"/>
+                                <Border x:Name="ChatAttachment" Visibility="Collapsed" Margin="0,0,0,8"
+                                        Padding="8" CornerRadius="10"
+                                        Background="{DynamicResource BgBrush}"
+                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Width="52" Height="52" CornerRadius="8"
+                                                Background="{DynamicResource PanelBrush}" Margin="0,0,10,0">
+                                            <Border.Clip>
+                                                <RectangleGeometry Rect="0,0,52,52" RadiusX="8" RadiusY="8"/>
+                                            </Border.Clip>
+                                            <Image x:Name="ChatAttachmentImage" Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="Fant"/>
+                                        </Border>
+                                        <TextBlock x:Name="ChatAttachmentInfo" Grid.Column="1"
+                                                   VerticalAlignment="Center" FontSize="11"
+                                                   Foreground="{DynamicResource MutedBrush}"/>
+                                        <Button Grid.Column="2" Content="✕" Width="22" Height="22" Padding="0"
+                                                FontSize="11" Background="Transparent" BorderThickness="0"
+                                                VerticalAlignment="Top" Cursor="Hand"
+                                                Foreground="{DynamicResource MutedBrush}"
+                                                Click="OnChatAttachmentClearClick" ToolTip="Убрать картинку"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="ChatReplyBar" Visibility="Collapsed" Margin="0,0,0,8"
+                                        Padding="10,6" CornerRadius="10"
+                                        Background="{DynamicResource BgBrush}"
+                                        BorderBrush="{DynamicResource AccentBrush}"
+                                        BorderThickness="3,0,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock x:Name="ChatReplyAuthor" FontSize="11" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="ChatReplySnippet" FontSize="11" MaxHeight="16"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource MutedBrush}"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="✕" Width="22" Height="22" Padding="0"
+                                                FontSize="11" Background="Transparent" BorderThickness="0"
+                                                Cursor="Hand" Foreground="{DynamicResource MutedBrush}"
+                                                Click="OnChatReplyCancelClick" ToolTip="Отменить ответ"/>
+                                    </Grid>
+                                </Border>
+
+                                <Grid x:Name="ChatComposer" PreviewKeyDown="OnWindowPreviewKeyDown">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" x:Name="ChatAttachButton" Content="🖼"
+                                            ToolTip="Прикрепить картинку (Ctrl+V — из буфера)"
+                                            Click="OnChatAttachClick" Margin="0,0,8,0" Padding="12,4" FontSize="15"/>
+                                    <TextBox x:Name="ChatInput" Grid.Column="1" Margin="0,0,8,0" MaxLength="500"
+                                             KeyDown="OnChatInputKeyDown" AcceptsReturn="False"/>
+                                    <Button Grid.Column="2" Content="Отправить" Style="{StaticResource PrimaryButton}"
+                                            Click="OnChatSendClick"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+
+                    <!-- КАРТА -->
+                    <Grid x:Name="PageMap" Visibility="Collapsed" Margin="0,0,0,8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-
-                        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Общий чат лаунчера" Style="{StaticResource H2}" VerticalAlignment="Center"/>
-                                <Button Content="Обновить" Click="OnChatRefreshClick" Margin="16,0,0,0" Padding="14,6"
-                                        FontSize="12"/>
-                                <TextBlock x:Name="ChatState" Style="{StaticResource Muted}" VerticalAlignment="Center"
-                                           Margin="14,0,0,0" Text="Загрузка…"/>
-                            </StackPanel>
+                        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12"
+                                Padding="14,10">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Открыть в браузере"
+                                        Click="OnMapOpenBrowserClick" Margin="10,0,0,0"/>
+                                <Button DockPanel.Dock="Right" Content="Обновить"
+                                        Click="OnMapReloadClick" Margin="10,0,0,0"/>
+                                <TextBlock x:Name="MapState" Text="Карта сервера BlueMap"
+                                           Style="{StaticResource Muted}" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </DockPanel>
                         </Border>
-
-                        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,12">
-                            <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          CanContentScroll="False" Padding="0,0,8,0"
-                                          PanningMode="VerticalOnly">
-                                <ItemsControl x:Name="ChatList">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="0,0,0,10" Padding="12,10"
-                                                    Background="{DynamicResource PanelBrush}"
-                                                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
-                                                    CornerRadius="12">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Grid.Column="0" Width="36" Height="36" CornerRadius="12"
-                                                            Background="{DynamicResource BgBrush}" ClipToBounds="True"
-                                                            Margin="0,0,10,0" VerticalAlignment="Top">
-                                                        <Image Source="{Binding IconUrl}" Stretch="UniformToFill"/>
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding Author}" FontWeight="SemiBold"
-                                                                       FontSize="13"/>
-                                                            <TextBlock Text="{Binding TimeLabel}" FontSize="11"
-                                                                       Margin="10,2,0,0"
-                                                                       Foreground="{DynamicResource MutedBrush}"/>
-                                                            <TextBlock Text="изменено" FontSize="10" Margin="8,3,0,0"
-                                                                       Foreground="{DynamicResource MutedBrush}"
-                                                                       Visibility="{Binding Edited, Converter={StaticResource BoolToVisibility}}"/>
-                                                            <Button Content="Изменить" Tag="{Binding}" Click="OnChatEditClick"
-                                                                    Margin="10,0,0,0" Padding="8,2" FontSize="10"
-                                                                    Visibility="{Binding Mine, Converter={StaticResource BoolToVisibility}}"/>
-                                                            <Button Content="Удалить" Tag="{Binding}" Click="OnChatDeleteClick"
-                                                                    Margin="6,0,0,0" Padding="8,2" FontSize="10"
-                                                                    Visibility="{Binding Mine, Converter={StaticResource BoolToVisibility}}"/>
-                                                        </StackPanel>
-                                                        <TextBlock Text="{Binding Text}" FontSize="13" Margin="0,4,0,0"
-                                                                   TextWrapping="Wrap"/>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                                            <Button Content="{Binding LikeLabel}" Tag="{Binding}" Click="OnChatReactClick"
-                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
-                                                            <Button Content="{Binding HeartLabel}" Tag="{Binding}" Click="OnChatReactClick"
-                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
-                                                            <Button Content="{Binding FireLabel}" Tag="{Binding}" Click="OnChatReactClick"
-                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
-                                                            <Button Content="{Binding SmileLabel}" Tag="{Binding}" Click="OnChatReactClick"
-                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
-                                                            <Button Content="{Binding SadLabel}" Tag="{Binding}" Click="OnChatReactClick"
-                                                                    Padding="8,2" FontSize="11" Margin="0,0,4,0"/>
-                                                            <TextBlock Text="{Binding ReactionsLabel}" FontSize="11"
-                                                                       VerticalAlignment="Center" Margin="6,0,0,0"
-                                                                       Foreground="{DynamicResource MutedBrush}"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" ClipToBounds="True">
+                            <Grid>
+                                <wv2:WebView2 x:Name="MapView" Visibility="Collapsed"/>
+                                <TextBlock x:Name="MapFallback" Style="{StaticResource Muted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           TextWrapping="Wrap" TextAlignment="Center" Margin="24"/>
+                            </Grid>
                         </Border>
-
-                        <Grid Grid.Row="2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="ChatInput" Grid.Column="0" Margin="0,0,8,0" MaxLength="500"
-                                     KeyDown="OnChatInputKeyDown"/>
-                            <Button Grid.Column="1" Content="Отправить" Style="{StaticResource PrimaryButton}"
-                                    Click="OnChatSendClick"/>
-                        </Grid>
+                        <TextBlock Grid.Row="2" x:Name="MapHint" Style="{StaticResource Muted}"
+                                   FontSize="11" Margin="4,8,4,0" TextWrapping="Wrap"/>
                     </Grid>
 
                     <!-- НАСТРОЙКИ -->
@@ -615,6 +877,8 @@
                                     <CheckBox x:Name="OptAutoJoin" Content="Автовход на сервер"
                                               Foreground="{DynamicResource TextBrush}" Margin="0,0,20,0"/>
                                     <CheckBox x:Name="OptHoliday" Content="Праздничное оформление"
+                                              Foreground="{DynamicResource TextBrush}" Margin="0,0,20,0"/>
+                                    <CheckBox x:Name="OptSound" Content="Звук новых сообщений"
                                               Foreground="{DynamicResource TextBrush}"/>
                                 </StackPanel>
                             </StackPanel>
@@ -686,25 +950,55 @@
                 </Grid>
             </Border>
 
-            <!-- Уведомление о новом сообщении: слева снизу -->
-            <Border x:Name="ChatToast" Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                    Margin="20,0,0,0" Padding="14,10" CornerRadius="12" MaxWidth="360"
-                    Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource AccentBrush}"
-                    BorderThickness="1" Visibility="Collapsed" Cursor="Hand"
+            <!-- Всплывающее сообщение как в Telegram: справа снизу, поверх всего -->
+            <Border x:Name="ChatToast" Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="100"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Margin="0,0,20,20" MaxWidth="380"
+                    Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
+                    BorderThickness="1" CornerRadius="12" Visibility="Collapsed"
                     MouseLeftButtonUp="OnChatToastClick">
-                <StackPanel Orientation="Horizontal">
-                    <Border Width="32" Height="32" CornerRadius="10" Background="{DynamicResource BgBrush}"
-                            ClipToBounds="True" Margin="0,0,10,0">
-                        <Image x:Name="ChatToastIcon" Stretch="UniformToFill"/>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.35" Color="#000000"/>
+                </Border.Effect>
+                <Grid Margin="12,10,8,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="12"
+                            Background="{DynamicResource BgBrush}" Margin="0,0,10,0"
+                            VerticalAlignment="Top">
+                        <Border.Clip>
+                            <RectangleGeometry Rect="0,0,40,40" RadiusX="12" RadiusY="12"/>
+                        </Border.Clip>
+                        <Image x:Name="ChatToastIcon" Stretch="UniformToFill"
+                               RenderOptions.BitmapScalingMode="Fant"/>
                     </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="ChatToastTitle" FontWeight="SemiBold" FontSize="12"
-                                   Foreground="{DynamicResource TextBrush}"/>
-                        <TextBlock x:Name="ChatToastText" FontSize="11.5" MaxWidth="290"
-                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="ChatToastTitle" FontWeight="SemiBold" FontSize="12.5"
+                                       Foreground="{DynamicResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="230"/>
+                            <TextBlock x:Name="ChatToastTime" FontSize="10.5" Margin="8,2,0,0"
+                                       Foreground="{DynamicResource MutedBrush}"/>
+                        </StackPanel>
+                        <TextBlock x:Name="ChatToastText" FontSize="11.5" Margin="0,3,0,0"
+                                   MaxWidth="270" MaxHeight="34"
+                                   TextTrimming="CharacterEllipsis" TextWrapping="Wrap"
                                    Foreground="{DynamicResource MutedBrush}"/>
                     </StackPanel>
-                </StackPanel>
+
+                    <Button Grid.Column="2" x:Name="ChatToastClose" Content="✕"
+                            Width="22" Height="22" Padding="0" FontSize="11"
+                            VerticalAlignment="Top" Margin="8,-2,0,0"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{DynamicResource MutedBrush}"
+                            Cursor="Hand" Click="OnChatToastCloseClick"
+                            ToolTip="Закрыть"/>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

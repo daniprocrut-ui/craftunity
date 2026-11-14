@@ -19,4 +19,14 @@
     <PublishReadyToRun>false</PublishReadyToRun>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Sounds\Message.wav">
+      <LogicalName>CraftunityLauncher.Resources.Sounds.Message.wav</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+  </ItemGroup>
+
 </Project>
