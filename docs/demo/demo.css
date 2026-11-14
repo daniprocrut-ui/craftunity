@@ -20,6 +20,13 @@ body {
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Плавный возврат на сайт: демо гаснет и уезжает вниз. */
+html.page-leaving body {
+  opacity: 0;
+  transform: translateY(16px) scale(0.99);
 }
 
 code {

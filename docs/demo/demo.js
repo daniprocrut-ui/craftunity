@@ -490,6 +490,19 @@ function boot() {
   });
 
   $("#skinModel").addEventListener("change", drawSkin);
+
+  // Плавный возврат на сайт: страница гаснет и уезжает вниз, затем переход.
+  const back = document.getElementById("backLink");
+  if (back) {
+    back.addEventListener("click", (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+      event.preventDefault();
+      const target = back.href;
+      const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.documentElement.classList.add("page-leaving");
+      setTimeout(() => { window.location.href = target; }, reduce ? 0 : 300);
+    });
+  }
   $("#chatInput").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
