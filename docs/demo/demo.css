@@ -369,6 +369,15 @@ input[readonly] { opacity: .8; }
 .chat-ic.room-general { background: #223B82F6; }
 .chat-ic.room-announcements { background: #22FBBF24; }
 .chat-ic.room-news { background: #2234D399; }
+.chat-ic { position: relative; }
+.presence {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--panel); box-sizing: content-box;
+}
+.presence.in_game { background: #22C55E; }
+.presence.launcher { background: #EAB308; }
+.presence.offline { background: #EF4444; }
 .peer-list li:hover, .room-list li:hover { background: var(--card); }
 .room-list li.active { background: var(--card); color: var(--accent); font-weight: 600; }
 

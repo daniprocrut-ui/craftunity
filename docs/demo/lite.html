@@ -379,6 +379,15 @@ input[readonly] { opacity: .8; }
 .chat-ic.room-general { background: #223B82F6; }
 .chat-ic.room-announcements { background: #22FBBF24; }
 .chat-ic.room-news { background: #2234D399; }
+.chat-ic { position: relative; }
+.presence {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--panel); box-sizing: content-box;
+}
+.presence.in_game { background: #22C55E; }
+.presence.launcher { background: #EAB308; }
+.presence.offline { background: #EF4444; }
 .peer-list li:hover, .room-list li:hover { background: var(--card); }
 .room-list li.active { background: var(--card); color: var(--accent); font-weight: 600; }
 
@@ -893,12 +902,25 @@ function peerList() {
     .sort((a, b) => a.localeCompare(b, "ru"));
 }
 
+/** Статус игрока: в игре, только в лаунчере или не в сети. */
+const PRESENCE = {
+  "SonicWave": "in_game",
+  "Panda_MC": "launcher",
+  "Kotik": "offline",
+};
+
+function presenceOf(name) {
+  return PRESENCE[name] || "offline";
+}
+
 function renderPeers() {
   const box = $("#peers");
   if (!box) return;
   box.innerHTML = peerList()
     .map((name) => `<li data-peer="${name}"${state.peer === name ? ' class="active"' : ""}>
-      <span class="chat-ic">${initials(name)}</span><span class="peer-name">${name}</span>
+      <span class="chat-ic">${initials(name)}<i class="presence ${presenceOf(name)}" title="${
+        presenceOf(name) === "in_game" ? "в игре" : presenceOf(name) === "launcher" ? "в лаунчере" : "не в сети"
+      }"></i></span><span class="peer-name">${name}</span>
       <button class="peer-remove" data-remove="${name}" title="Удалить чат">✕</button>
     </li>`)
     .join("");

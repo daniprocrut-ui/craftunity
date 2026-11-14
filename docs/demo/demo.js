@@ -119,12 +119,25 @@ function peerList() {
     .sort((a, b) => a.localeCompare(b, "ru"));
 }
 
+/** Статус игрока: в игре, только в лаунчере или не в сети. */
+const PRESENCE = {
+  SonicWave: "in_game",
+  Panda_MC: "launcher",
+  Kotik: "offline",
+};
+
+function presenceOf(name) {
+  return PRESENCE[name] || "offline";
+}
+
 function renderPeers() {
   const box = $("#peers");
   if (!box) return;
   box.innerHTML = peerList()
     .map((name) => `<li data-peer="${name}"${state.peer === name ? ' class="active"' : ""}>
-      <span class="chat-ic">${initials(name)}</span><span class="peer-name">${name}</span>
+      <span class="chat-ic">${initials(name)}<i class="presence ${presenceOf(name)}" title="${
+        presenceOf(name) === "in_game" ? "в игре" : presenceOf(name) === "launcher" ? "в лаунчере" : "не в сети"
+      }"></i></span><span class="peer-name">${name}</span>
       <button class="peer-remove" data-remove="${name}" title="Удалить чат">✕</button>
     </li>`)
     .join("");
