@@ -1,7 +1,0 @@
-customization/craftunity_title_screen.txt
-assets/craftunity/background.png
-assets/craftunity/logo.png
-assets/craftunity/btn_normal.png
-assets/craftunity/btn_hover.png
-assets/craftunity/btn_focus.png
-assets/craftunity/btn_focus_hover.png
