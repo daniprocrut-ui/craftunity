@@ -78,12 +78,12 @@ const CHATS = {
   general: [
     { author: "SonicWave", mine: false, time: "14:02", text: "Кто-нибудь ставил новый шейдер? На 1.20.1 очень бодро.", reacts: [["👍", 3], ["🔥", 1]] },
     { author: "Panda_MC", mine: false, time: "14:05", text: "Да, поставил Complementary через вкладку Контент. Всё в один клик.", image: "скриншот · 1280×720", reacts: [["👍", 5]] },
-    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.38 — плавные анимации переходов и уведомлений.", reacts: [["❤️", 2], ["😄", 1]] },
+    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.40 — реакции на сообщения и ответы.", reacts: [["❤️", 2], ["😄", 1]] },
     { author: "Kotik", mine: false, time: "14:11", text: "У меня клиент скачался, но Java качается второй раз.", edited: true, reacts: [] },
     { author: "Danipro914", mine: true, time: "14:12", text: "Это кэш Java: во вкладке Настройки выключи «Автоматически скачивать Java», если 17 уже стоит.", reacts: [["👍", 1]] },
   ],
   announcements: [
-    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.38: анимации страниц и всплывающих уведомлений.", reacts: [["🔥", 7], ["👍", 4]] },
+    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.40: цветные реакции, ответы на сообщения, иконки чатов.", reacts: [["🔥", 7], ["👍", 4]] },
     { author: "Danipro914", mine: true, time: "13:40", text: "Сервер переключён на 1.20.1 · Fabric. Все моды подтянутся автоматически.", reacts: [["👍", 3]] },
   ],
   news: [
