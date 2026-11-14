@@ -37,6 +37,7 @@
   body {
     background:
       radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--bg-glow) 90%, transparent), transparent 65%),
+      radial-gradient(120% 70% at 50% 110%, rgba(72, 108, 255, 0.14), transparent 62%),
       var(--bg);
     color: var(--text);
     font-family: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -55,6 +56,19 @@
       radial-gradient(55% 55% at 50% 0%, rgba(255, 138, 61, 0.34), rgba(255, 138, 61, 0.06) 45%, transparent 72%),
       radial-gradient(48% 48% at 12% 6%, rgba(72, 108, 255, 0.32), rgba(72, 108, 255, 0.05) 50%, transparent 74%),
       radial-gradient(46% 46% at 88% 12%, rgba(48, 216, 200, 0.22), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: auto -10% -15% -10%;
+    height: 620px;
+    background:
+      radial-gradient(50% 55% at 50% 100%, rgba(255, 138, 61, 0.26), rgba(255, 138, 61, 0.05) 48%, transparent 74%),
+      radial-gradient(46% 50% at 85% 96%, rgba(72, 108, 255, 0.22), transparent 72%),
+      radial-gradient(44% 48% at 14% 94%, rgba(48, 216, 200, 0.16), transparent 72%);
     pointer-events: none;
     z-index: 0;
   }
