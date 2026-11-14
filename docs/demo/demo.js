@@ -98,6 +98,39 @@ const CHATS = {
 
 const state = { view: "play", kind: "mod", filter: "all", room: "general", peer: "", theme: "dark" };
 
+/** Удалённые личные чаты: как в лаунчере, живут между перезапусками. */
+const HIDDEN_KEY = "craftunity.demo.hiddenPeers";
+const hiddenPeers = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"));
+
+function saveHiddenPeers() {
+  localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenPeers]));
+}
+
+/** Собеседники: те, кто есть в личных, плюс авторы из истории общего чата. */
+function peerList() {
+  const names = Object.keys(CHATS.dm);
+  const own = "Danipro914";
+  CHATS.general.forEach((msg) => {
+    if (msg.mine || msg.author === own) return;
+    if (!names.includes(msg.author)) names.push(msg.author);
+  });
+  return names
+    .filter((name) => name !== own && !hiddenPeers.has(name))
+    .sort((a, b) => a.localeCompare(b, "ru"));
+}
+
+function renderPeers() {
+  const box = $("#peers");
+  if (!box) return;
+  box.innerHTML = peerList()
+    .map((name) => `<li data-peer="${name}"${state.peer === name ? ' class="active"' : ""}>
+      <span class="chat-ic">${initials(name)}</span><span class="peer-name">${name}</span>
+      <button class="peer-remove" data-remove="${name}" title="Удалить чат">✕</button>
+    </li>`)
+    .join("");
+}
+
+
 function initials(name) {
   return (name || "?").replace(/[^A-Za-zА-Яа-я0-9]/g, "").slice(0, 1).toUpperCase();
 }
@@ -329,6 +362,7 @@ function boot() {
 
   $("#modResults").innerHTML = CATALOG.mod.map(modCard).join("");
   $("#installedList").innerHTML = INSTALLED.map(instCard).join("");
+  renderPeers();
   renderChat();
   drawSkin();
 
@@ -398,9 +432,28 @@ function boot() {
       renderChat();
       return;
     }
+    const removeBtn = target.closest(".peer-remove");
+    if (removeBtn) {
+      event.stopPropagation();
+      const name = removeBtn.dataset.remove;
+      if (!confirm("Удалить чат с «" + name + "» из лаунчера?\n\nЧат пропадёт из списка личных. История переписки сохранится и вернётся, если снова открыть чат с этим игроком.")) return;
+      hiddenPeers.add(name);
+      saveHiddenPeers();
+      if (state.peer === name) {
+        state.peer = "";
+        state.room = "general";
+        $$("#rooms li").forEach((li) => li.classList.toggle("active", li.dataset.room === "general"));
+      }
+      renderPeers();
+      renderChat();
+      toast("Чат с " + name + " удалён из лаунчера");
+      return;
+    }
     const peer = target.closest("#peers li");
     if (peer) {
-      state.peer = peer.dataset.peer;
+      const name = peer.dataset.peer;
+      state.peer = name;
+      if (hiddenPeers.delete(name)) saveHiddenPeers();
       $$("#peers li").forEach((li) => li.classList.toggle("active", li === peer));
       $$("#rooms li").forEach((li) => li.classList.remove("active"));
       renderChat();

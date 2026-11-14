@@ -480,3 +480,15 @@ input[readonly] { opacity: .8; }
   .chat-view.active { grid-template-columns: 1fr; }
   .toolbar { grid-template-columns: 1fr 1fr; }
 }
+
+.peer-list li { position: relative; }
+.peer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peer-remove {
+  flex: none; width: 18px; height: 18px; padding: 0; border: none; border-radius: 6px;
+  background: transparent; color: var(--muted); font-size: 10px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+.peer-list li:hover .peer-remove { opacity: 1; }
+.peer-remove:hover { background: #EF444422; color: #EF4444; }
+
+

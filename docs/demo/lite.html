@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Craftunity Launcher 1.5.40 — демо</title>
+<title>Craftunity Launcher 1.5.41 — демо</title>
 <link rel="icon" href="../icons/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="../icons/icon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="../icons/icon-180.png">
@@ -523,7 +523,7 @@ input[readonly] { opacity: .8; }
     </nav>
     <div class="side-foot">
       <div class="net"><span class="dot ok"></span><span>Сервер доступен</span></div>
-      <div>Версия лаунчера <span id="launcherVer">1.5.40</span></div>
+      <div>Версия лаунчера <span id="launcherVer">1.5.41</span></div>
       <div>craftunity.mcsh.io</div>
     </div>
   </aside>
@@ -694,11 +694,7 @@ input[readonly] { opacity: .8; }
         <div class="card chat-side">
           <h3>Чаты</h3>
           <p class="muted small">Личные сообщения</p>
-          <ul class="peer-list" id="peers">
-            <li data-peer="SonicWave"><span class="chat-ic">S</span><span>SonicWave</span></li>
-            <li data-peer="Panda_MC"><span class="chat-ic">P</span><span>Panda_MC</span></li>
-            <li data-peer="Kotik"><span class="chat-ic">K</span><span>Kotik</span></li>
-          </ul>
+          <ul class="peer-list" id="peers"></ul>
           <ul class="room-list" id="rooms">
             <li data-room="general" class="active"><span class="chat-ic room-general">💬</span><span>Общий чат</span></li>
             <li data-room="announcements"><span class="chat-ic room-announcements">📢</span><span>Объявления</span></li>
@@ -765,7 +761,7 @@ input[readonly] { opacity: .8; }
       </section>
     </div>
 
-    <div class="statusbar"><span id="statusText">Готово к запуску</span><span>v1.5.40</span></div>
+    <div class="statusbar"><span id="statusText">Готово к запуску</span><span>v1.5.41</span></div>
   </div>
 </div>
 
@@ -856,12 +852,12 @@ const CHATS = {
   general: [
     { author: "SonicWave", mine: false, time: "14:02", text: "Кто-нибудь ставил новый шейдер? На 1.20.1 очень бодро.", reacts: [["👍", 3], ["🔥", 1]] },
     { author: "Panda_MC", mine: false, time: "14:05", text: "Да, поставил Complementary через вкладку Контент. Всё в один клик.", image: "скриншот · 1280×720", reacts: [["👍", 5]] },
-    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.40 — реакции на сообщения и ответы.", reacts: [["❤️", 2], ["😄", 1]] },
+    { author: "Danipro914", mine: true, time: "14:07", text: "Обновил сборку до 1.5.41 — реакции на сообщения и ответы.", reacts: [["❤️", 2], ["😄", 1]] },
     { author: "Kotik", mine: false, time: "14:11", text: "У меня клиент скачался, но Java качается второй раз.", edited: true, reacts: [] },
     { author: "Danipro914", mine: true, time: "14:12", text: "Это кэш Java: во вкладке Настройки выключи «Автоматически скачивать Java», если 17 уже стоит.", reacts: [["👍", 1]] },
   ],
   announcements: [
-    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.40: цветные реакции, ответы на сообщения, иконки чатов.", reacts: [["🔥", 7], ["👍", 4]] },
+    { author: "Danipro914", mine: true, time: "13:20", text: "Версия лаунчера 1.5.41: цветные реакции, ответы на сообщения, иконки чатов.", reacts: [["🔥", 7], ["👍", 4]] },
     { author: "Danipro914", mine: true, time: "13:40", text: "Сервер переключён на 1.20.1 · Fabric. Все моды подтянутся автоматически.", reacts: [["👍", 3]] },
   ],
   news: [
@@ -875,6 +871,38 @@ const CHATS = {
 };
 
 const state = { view: "play", kind: "mod", filter: "all", room: "general", peer: "", theme: "dark" };
+
+/** Удалённые личные чаты: как в лаунчере, живут между перезапусками. */
+const HIDDEN_KEY = "craftunity.demo.hiddenPeers";
+const hiddenPeers = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"));
+
+function saveHiddenPeers() {
+  localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenPeers]));
+}
+
+/** Собеседники: те, кто есть в личных, плюс авторы из истории общего чата. */
+function peerList() {
+  const names = Object.keys(CHATS.dm);
+  const own = "Danipro914";
+  CHATS.general.forEach((msg) => {
+    if (msg.mine || msg.author === own) return;
+    if (!names.includes(msg.author)) names.push(msg.author);
+  });
+  return names
+    .filter((name) => name !== own && !hiddenPeers.has(name))
+    .sort((a, b) => a.localeCompare(b, "ru"));
+}
+
+function renderPeers() {
+  const box = $("#peers");
+  if (!box) return;
+  box.innerHTML = peerList()
+    .map((name) => `<li data-peer="${name}"${state.peer === name ? ' class="active"' : ""}>
+      <span class="chat-ic">${initials(name)}</span><span class="peer-name">${name}</span>
+      <button class="peer-remove" data-remove="${name}" title="Удалить чат">✕</button>
+    </li>`)
+    .join("");
+}
 
 function initials(name) {
   return (name || "?").replace(/[^A-Za-zА-Яа-я0-9]/g, "").slice(0, 1).toUpperCase();
@@ -1107,6 +1135,7 @@ function boot() {
 
   $("#modResults").innerHTML = CATALOG.mod.map(modCard).join("");
   $("#installedList").innerHTML = INSTALLED.map(instCard).join("");
+  renderPeers();
   renderChat();
   drawSkin();
 
@@ -1176,9 +1205,28 @@ function boot() {
       renderChat();
       return;
     }
+    const removeBtn = target.closest(".peer-remove");
+    if (removeBtn) {
+      event.stopPropagation();
+      const name = removeBtn.dataset.remove;
+      if (!confirm("Удалить чат с «" + name + "» из лаунчера?\n\nЧат пропадёт из списка личных. История переписки сохранится и вернётся, если снова открыть чат с этим игроком.")) return;
+      hiddenPeers.add(name);
+      saveHiddenPeers();
+      if (state.peer === name) {
+        state.peer = "";
+        state.room = "general";
+        $$("#rooms li").forEach((li) => li.classList.toggle("active", li.dataset.room === "general"));
+      }
+      renderPeers();
+      renderChat();
+      toast("Чат с " + name + " удалён из лаунчера");
+      return;
+    }
     const peer = target.closest("#peers li");
     if (peer) {
-      state.peer = peer.dataset.peer;
+      const name = peer.dataset.peer;
+      state.peer = name;
+      if (hiddenPeers.delete(name)) saveHiddenPeers();
       $$("#peers li").forEach((li) => li.classList.toggle("active", li === peer));
       $$("#rooms li").forEach((li) => li.classList.remove("active"));
       renderChat();
