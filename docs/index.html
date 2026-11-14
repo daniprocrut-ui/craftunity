@@ -135,6 +135,19 @@
 
   .hero {
     padding: 64px 0 40px;
+    position: relative;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: -40px -120px 0 -120px;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(42% 60% at 22% 42%, rgba(255, 138, 61, 0.22), transparent 72%),
+      radial-gradient(38% 55% at 62% 30%, rgba(72, 108, 255, 0.16), transparent 74%);
+    filter: blur(28px);
   }
 
   .eyebrow {
