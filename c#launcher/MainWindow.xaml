@@ -57,7 +57,8 @@
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem x:Name="NavSettings" Content="⚙  Настройки"/>
-                    <ListBoxItem x:Name="NavMap" Content="🗺  Карта"/>
+                    <ListBoxItem x:Name="NavMap" Content="🗺  Карта" IsEnabled="False"
+                                  ToolTip="Карта временно недоступна"/>
                 </ListBox>
 
                 <StackPanel Grid.Row="2">
