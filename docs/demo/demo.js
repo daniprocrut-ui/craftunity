@@ -99,9 +99,18 @@ const CHATS = {
 
 const state = { view: "play", kind: "mod", filter: "all", room: "general", peer: "", theme: "dark" };
 
-/** Удалённые личные чаты: как в лаунчере, живут между перезапусками. */
+/** Удалённые личные чаты: скрытие живёт в localStorage. */
 const HIDDEN_KEY = "craftunity.demo.hiddenPeers";
+const HIDDEN_VERSION_KEY = "craftunity.demo.hiddenPeers.v";
+const HIDDEN_VERSION = "2";
 const hiddenPeers = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"));
+
+// Один раз сбрасываем старый список скрытых: вернули все ЛС на сайте.
+if (localStorage.getItem(HIDDEN_VERSION_KEY) !== HIDDEN_VERSION) {
+  hiddenPeers.clear();
+  localStorage.setItem(HIDDEN_KEY, "[]");
+  localStorage.setItem(HIDDEN_VERSION_KEY, HIDDEN_VERSION);
+}
 
 function saveHiddenPeers() {
   localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenPeers]));
