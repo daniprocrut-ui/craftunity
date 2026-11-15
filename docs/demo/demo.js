@@ -139,7 +139,6 @@ function renderPeers() {
       <span class="chat-ic">${initials(name)}<i class="presence ${presenceOf(name)}" title="${
         presenceOf(name) === "in_game" ? "в игре" : presenceOf(name) === "launcher" ? "в лаунчере" : "не в сети"
       }"></i></span><span class="peer-name">${name}</span>
-      <button class="peer-remove" data-remove="${name}" title="Удалить чат">✕</button>
     </li>`)
     .join("");
 }
@@ -632,23 +631,6 @@ function boot() {
       $$("#rooms li").forEach((li) => li.classList.toggle("active", li === room));
       $$("#peers li").forEach((li) => li.classList.remove("active"));
       renderChat();
-      return;
-    }
-    const removeBtn = target.closest(".peer-remove");
-    if (removeBtn) {
-      event.stopPropagation();
-      const name = removeBtn.dataset.remove;
-      if (!confirm("Удалить чат с «" + name + "» из лаунчера?\n\nЧат пропадёт из списка личных. История переписки сохранится и вернётся, если снова открыть чат с этим игроком.")) return;
-      hiddenPeers.add(name);
-      saveHiddenPeers();
-      if (state.peer === name) {
-        state.peer = "";
-        state.room = "general";
-        $$("#rooms li").forEach((li) => li.classList.toggle("active", li.dataset.room === "general"));
-      }
-      renderPeers();
-      renderChat();
-      toast("Чат с " + name + " удалён из лаунчера");
       return;
     }
     const peer = target.closest("#peers li");
