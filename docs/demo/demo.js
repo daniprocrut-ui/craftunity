@@ -1,4 +1,4 @@
-const $ = (sel) => document.querySelector(sel);
+﻿const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const VIEW_META = {
@@ -9,6 +9,7 @@ const VIEW_META = {
   skin: ["Скин", "Загрузка и предпросмотр скина"],
   account: ["Аккаунт", "Оффлайн-профиль или ely.by"],
   chat: ["Чат", "Общий чат, объявления, новости и личные сообщения"],
+  ads: ["Объявления", "Купить или продать предметы: предложения и решения автора"],
   settings: ["Настройки", "Java, память, темы, манифест обновлений"],
 };
 
@@ -318,6 +319,192 @@ function togglePalette(button, msg) {
   button.parentElement.appendChild(box);
 }
 
+
+// ---------------------------------------------------------------- объявления
+
+const ADS = [
+  {
+    id: 4, author: "Danipro914", mine: true, side: "buy", item: "Дубовые доски", itemCount: 64,
+    priceItem: "Кварц", priceCount: 16, state: "open",
+    offers: [
+      { user: "ProbeOne", count: 64, price: 16, state: "pending" },
+      { user: "ProbeThree", count: 32, price: 8, state: "pending" },
+    ],
+  },
+  {
+    id: 2, author: "ProbeOne", mine: false, side: "sell", item: "Алмаз", itemCount: 64,
+    priceItem: "Железо", priceCount: 192, state: "open", offers: [],
+  },
+  {
+    id: 1, author: "ProbeTwo", mine: false, side: "sell", item: "Изумруд", itemCount: 32,
+    priceItem: "Алмаз", priceCount: 8, state: "closed", closedWith: "Danipro914",
+    offers: [{ user: "Danipro914", count: 32, price: 8, state: "accepted" }],
+  },
+];
+
+const ADS_ITEMS = [
+  ["Алмаз", "◆"], ["Изумруд", "◆"], ["Кварц", "◇"], ["Железо", "▤"], ["Золото", "●"],
+  ["Дубовые доски", "▤"], ["Камень", "▩"], ["Стекло", "▢"], ["Обсидиан", "■"],
+  ["Жемчуг Эндера", "◍"], ["Книга", "▭"], ["Хлеб", "▬"], ["Уголь", "●"],
+  ["Лазурит", "◈"], ["Медь", "◆"], ["Незеритовый слиток", "▮"],
+];
+
+let adsSide = "sell";
+
+function adsIconOf(name) {
+  const hit = ADS_ITEMS.find(([n]) => n.toLowerCase() === String(name || "").toLowerCase());
+  return hit ? hit[1] : "▫";
+}
+
+function adOfferText(ad, offer) {
+  return `${offer.user}: ${offer.count} шт. за ${offer.price} ${ad.priceItem.toLowerCase()}`;
+}
+
+function adCardHtml(ad) {
+  const closed = ad.state === "closed";
+  const border = closed ? "#22C55E" : "var(--line)";
+  const sideLabel = ad.side === "sell" ? "Продаю" : "Куплю";
+  const asked = ad.side === "sell"
+    ? `${ad.itemCount} ${ad.item.toLowerCase()} за ${ad.priceCount} ${ad.priceItem.toLowerCase()}`
+    : `${ad.itemCount} ${ad.item.toLowerCase()} в обмен на ${ad.priceCount} ${ad.priceItem.toLowerCase()}`;
+  const offers = ad.offers.map((offer) => {
+    const color = offer.state === "pending" ? "var(--muted)"
+      : offer.state === "accepted" ? "#22C55E" : "#EF4444";
+    const buttons = offer.state === "pending" && ad.mine
+      ? `<button class="btn small" data-ad="${ad.id}" data-offer="${offer.user}" data-decide="yes">Да</button>
+         <button class="btn small" data-ad="${ad.id}" data-offer="${offer.user}" data-decide="no">Нет</button>`
+      : "";
+    return `<div class="ad-offer" style="border-color:${color}66">
+      <span style="color:${color}">${adOfferText(ad, offer)}</span>
+      <span class="ad-offer-actions">${buttons}</span>
+    </div>`;
+  }).join("");
+  const status = closed ? `Закрыто${ad.closedWith ? " · " + ad.closedWith : ""}` : "Открыто";
+  const mineButtons = `<button class="btn small" data-ad="${ad.id}" data-offer-action="delete">Удалить</button>`;
+  const offerButton = ad.mine ? ""
+    : `<button class="btn small" data-ad="${ad.id}" data-offer-action="offer">Предложить</button>`;
+  return `<div class="ad-card" style="border-color:${border}">
+    <div class="ad-head">
+      <span class="ad-icon">${adsIconOf(ad.item)}</span>
+      <div>
+        <div class="ad-title">${sideLabel}: ${ad.item} ×${ad.itemCount}</div>
+        <div class="muted small">${asked} · ${ad.author}</div>
+      </div>
+      <span class="muted small ad-status">${status}</span>
+    </div>
+    <div class="ad-actions">${offerButton}${ad.mine ? mineButtons : ""}</div>
+    ${offers ? `<div class="ad-offers">${offers}</div>` : ""}
+  </div>`;
+}
+
+function renderAds() {
+  const list = $("#adsList");
+  if (!list) return;
+  const ordered = [...ADS].sort((a, b) =>
+    (a.state === "closed" ? 1 : 0) - (b.state === "closed" ? 1 : 0) || b.id - a.id);
+  list.innerHTML = ordered.map(adCardHtml).join("");
+  const open = ADS.filter((a) => a.state === "open").length;
+  const state = $("#adsState");
+  if (state) state.textContent = `Объявлений в демо: ${ADS.length} · открытых: ${open}`;
+}
+
+function adsSuggest() {
+  const box = $("#adsSuggest");
+  if (!box) return;
+  const probe = ($("#adsItem").value || "").trim().toLowerCase();
+  const price = probe || ($("#adsPrice").value || "").trim().toLowerCase();
+  $("#adsItemIcon").textContent = adsIconOf($("#adsItem").value);
+  $("#adsPriceIcon").textContent = adsIconOf($("#adsPrice").value);
+  const key = probe || price;
+  const match = key ? ADS_ITEMS.filter(([n]) => n.toLowerCase().includes(key)).slice(0, 8) : [];
+  box.innerHTML = match.map(([n]) =>
+    `<button class="chip ad-chip" data-item="${n}">${adsIconOf(n)} ${n}</button>`).join("");
+}
+
+function adsDecide(adId, user, accept) {
+  const ad = ADS.find((a) => a.id === adId);
+  if (!ad) return;
+  const offer = ad.offers.find((o) => o.user === user);
+  if (!offer) return;
+  offer.state = accept ? "accepted" : "declined";
+  if (accept) {
+    ad.state = "closed";
+    ad.closedWith = user;
+    ad.offers.forEach((o) => { if (o.state === "pending") o.state = "declined"; });
+  }
+  renderAds();
+  if (accept) {
+    toast(`Предложение принято · открываю личные с ${user} в лаунчере`);
+    return;
+  }
+  toast("Предложение отклонено");
+}
+
+function bindAds() {
+  const compose = $("#adsCompose");
+  if (!compose) return;
+  compose.addEventListener("click", () => {
+    const form = $("#adsForm");
+    form.hidden = !form.hidden;
+    if (!form.hidden) adsSuggest();
+  });
+  $("#adsCancel").addEventListener("click", () => { $("#adsForm").hidden = true; });
+  $("#adsRefresh").addEventListener("click", () => { renderAds(); toast("Список обновлён (демо)"); });
+  $("#adsItem").addEventListener("input", adsSuggest);
+  $("#adsPrice").addEventListener("input", adsSuggest);
+  $$("#view-ads .ads-side").forEach((b) => b.addEventListener("click", () => {
+    adsSide = b.dataset.side;
+    $$("#view-ads .ads-side").forEach((x) => x.classList.toggle("active", x === b));
+  }));
+  $("#adsSuggest").addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-item]");
+    if (!chip) return;
+    const target = ($("#adsItem").value || "").trim() ? $("#adsPrice") : $("#adsItem");
+    target.value = chip.dataset.item;
+    adsSuggest();
+  });
+  $("#adsPublish").addEventListener("click", () => {
+    const item = ($("#adsItem").value || "").trim();
+    const price = ($("#adsPrice").value || "").trim();
+    if (!item || !price) {
+      toast("Выберите предмет и цену из подсказок");
+      return;
+    }
+    ADS.push({
+      id: Math.max(0, ...ADS.map((a) => a.id)) + 1,
+      author: "Danipro914", mine: true, side: adsSide, item,
+      itemCount: parseInt($("#adsItemCount").value, 10) || 1,
+      priceItem: price, priceCount: parseInt($("#adsPriceCount").value, 10) || 1,
+      state: "open", offers: [],
+    });
+    $("#adsForm").hidden = true;
+    $("#adsItem").value = "";
+    $("#adsPrice").value = "";
+    renderAds();
+    toast("Объявление опубликовано (демо)");
+  });
+  $("#adsList").addEventListener("click", (event) => {
+    const decide = event.target.closest("[data-decide]");
+    if (decide) {
+      adsDecide(Number(decide.dataset.ad), decide.dataset.offer, decide.dataset.decide === "yes");
+      return;
+    }
+    const action = event.target.closest("[data-offer-action]");
+    if (!action) return;
+    const id = Number(action.dataset.ad);
+    if (action.dataset.offerAction === "delete") {
+      const index = ADS.findIndex((a) => a.id === id);
+      if (index >= 0) ADS.splice(index, 1);
+      renderAds();
+      toast("Объявление удалено (демо)");
+      return;
+    }
+    const ad = ADS.find((a) => a.id === id);
+    if (ad) toast(`В лаунчере откроется форма предложения по «${ad.item}»`);
+  });
+  renderAds();
+}
+
 function showView(id) {
   state.view = id;
   const meta = VIEW_META[id] || VIEW_META.play;
@@ -331,6 +518,7 @@ function showView(id) {
     $("#chatBadge").hidden = true;
   }
   if (id === "skin") drawSkin();
+  if (id === "ads") renderAds();
 }
 
 function drawSkin() {
@@ -378,6 +566,7 @@ function boot() {
   renderPeers();
   renderChat();
   drawSkin();
+  bindAds();
 
   $$("#nav button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
 

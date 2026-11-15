@@ -547,4 +547,52 @@ input[readonly] { opacity: .8; }
 .peer-list li:hover .peer-remove { opacity: 1; }
 .peer-remove:hover { background: #EF444422; color: #EF4444; }
 
+/* ------------------------------------------------------------- объявления */
 
+.ads-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ads-head h3 { margin: 0 0 4px; }
+.ads-head-actions { display: flex; gap: 8px; }
+
+.ads-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ads-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ads-side.active { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.ads-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px;
+  background: var(--panel); color: var(--muted); font-size: 12px; flex: none;
+}
+.ads-field {
+  height: 36px; padding: 0 10px; border-radius: 8px;
+  background: var(--panel); border: 1px solid var(--line);
+  color: var(--text); font: inherit; font-size: 13px;
+}
+.ads-field:focus { outline: none; border-color: var(--accent); }
+.ads-item-box { width: 160px; }
+.ads-count { width: 64px; }
+.ads-suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ads-suggest:empty { display: none; }
+.ad-chip { font-size: 12px; }
+.ads-form-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+.ads-list { display: flex; flex-direction: column; gap: 10px; }
+.ad-card {
+  padding: 12px 14px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--line);
+}
+.ad-head { display: flex; align-items: center; gap: 10px; }
+.ad-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px; flex: none;
+  background: var(--panel); color: var(--accent); font-size: 13px;
+}
+.ad-title { font-weight: 600; font-size: 13.5px; }
+.ad-status { margin-left: auto; }
+.ad-actions { display: flex; gap: 8px; margin-top: 10px; }
+.ad-offers { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.ad-offer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line); font-size: 12.5px;
+}
+.ad-offer-actions { display: flex; gap: 6px; flex: none; }
+.ad-offer-actions:empty { display: none; }

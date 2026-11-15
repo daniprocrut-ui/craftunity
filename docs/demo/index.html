@@ -34,6 +34,7 @@
       <button data-view="skin"><span class="ico">☻</span><span class="lbl">Скин</span></button>
       <button data-view="account"><span class="ico">◉</span><span class="lbl">Аккаунт</span></button>
       <button data-view="chat"><span class="ico">✉</span><span class="lbl">Чат</span><i class="badge" id="chatBadge" hidden>2</i></button>
+      <button data-view="ads"><span class="ico">📢</span><span class="lbl">Объявления</span></button>
       <button data-view="settings"><span class="ico">⚙</span><span class="lbl">Настройки</span></button>
     </nav>
     <div class="side-foot">
@@ -236,6 +237,41 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- ОБЪЯВЛЕНИЯ -->
+      <section class="view" id="view-ads">
+        <div class="card mb">
+          <div class="ads-head">
+            <div>
+              <h3>Объявления игроков</h3>
+              <p class="muted small" id="adsState">Открытых объявлений: 3</p>
+            </div>
+            <div class="ads-head-actions">
+              <button class="btn small" id="adsRefresh">Обновить</button>
+              <button class="btn primary small" id="adsCompose">Новое объявление</button>
+            </div>
+          </div>
+
+          <div class="ads-form" id="adsForm" hidden>
+            <div class="ads-row">
+              <button class="btn small ads-side active" data-side="sell">Продаю</button>
+              <button class="btn small ads-side" data-side="buy">Куплю</button>
+              <span class="ads-icon" id="adsItemIcon">◆</span>
+              <input type="text" class="ads-field ads-item-box" id="adsItem" placeholder="Предмет" maxlength="40">
+              <input type="text" class="ads-field ads-count" id="adsItemCount" value="64">
+              <span class="ads-icon" id="adsPriceIcon">▣</span>
+              <input type="text" class="ads-field ads-item-box" id="adsPrice" placeholder="Чем платят" maxlength="40">
+              <input type="text" class="ads-field ads-count" id="adsPriceCount" value="16">
+            </div>
+            <div class="ads-suggest" id="adsSuggest"></div>
+            <div class="ads-form-actions">
+              <button class="btn primary small" id="adsPublish">Опубликовать</button>
+              <button class="btn small" id="adsCancel">Отмена</button>
+            </div>
+          </div>
+        </div>
+        <div class="ads-list" id="adsList"></div>
       </section>
 
       <!-- НАСТРОЙКИ -->
