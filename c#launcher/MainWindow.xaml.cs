@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -185,7 +185,7 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "Скачивание обновления…";
             installer = await LauncherUpdate.DownloadAsync(release, p =>
-                Dispatcher.Invoke(() => StatusText.Text = $"Скачивание обновления… {p:P0}"));
+                Dispatcher.InvokeAsync(() => StatusText.Text = $"Скачивание обновления… {p:P0}"));
         }
         catch
         {
@@ -306,7 +306,7 @@ public partial class MainWindow : Window
                 try
                 {
                     var state = await _api!.GetAsync("/api/state", token);
-                    Dispatcher.Invoke(() => ApplyState(state));
+                    await Dispatcher.InvokeAsync(() => ApplyState(state));
                     _gameRunning = state.Bool("running");
                     if (_overview is null) await TryLoadOverviewAsync(token);
                 }
@@ -336,6 +336,17 @@ public partial class MainWindow : Window
                     catch
                     {
                         // чат не критичен для работы лаунчера
+                    }
+                }
+                if (_chatTick % 20 == 0 && _overview is not null)
+                {
+                    try
+                    {
+                        await PollAdsAsync();
+                    }
+                    catch
+                    {
+                        // объявления не критичны для работы лаунчера
                     }
                 }
             }
@@ -617,8 +628,9 @@ public partial class MainWindow : Window
             ("Скин", "Ваш скин и его модель"),
             ("Аккаунт", "Оффлайн-ник или ely.by"),
             ("Чат", "Общий чат участников лаунчера"),
+            ("Объявления", "Купля-продажа предметов между игроками"),
+            ("Новости", "Объявления сервера: публикует только Danipro914"),
             ("Настройки", "Вид, игра, каталоги, манифест"),
-            ("Карта", "Общая карта сервера с игроками"),
         };
         if (index >= 0 && index < titles.Length)
         {
@@ -638,9 +650,10 @@ public partial class MainWindow : Window
         PageScroll.VerticalScrollBarVisibility = index == 6
             ? ScrollBarVisibility.Disabled
             : ScrollBarVisibility.Auto;
-        PageSettings.Visibility = index == 7 ? Visibility.Visible : Visibility.Collapsed;
-        PageMap.Visibility = index == 8 ? Visibility.Visible : Visibility.Collapsed;
-        PageScroll.VerticalScrollBarVisibility = index is 6 or 8
+        PageAds.Visibility = index == 7 ? Visibility.Visible : Visibility.Collapsed;
+        PageNews.Visibility = index == 8 ? Visibility.Visible : Visibility.Collapsed;
+        PageSettings.Visibility = index == 9 ? Visibility.Visible : Visibility.Collapsed;
+        PageScroll.VerticalScrollBarVisibility = index is 6
             ? ScrollBarVisibility.Disabled
             : ScrollBarVisibility.Auto;
         SetCompactNav(index == 6);
@@ -656,8 +669,9 @@ public partial class MainWindow : Window
                 4 => PageSkin,
                 5 => PageAccount,
                 6 => PageChat,
-                7 => PageSettings,
-                8 => PageMap,
+                7 => PageAds,
+                8 => PageNews,
+                9 => PageSettings,
                 _ => PagePlay,
             };
             AnimatePageIn(active);
@@ -674,8 +688,11 @@ public partial class MainWindow : Window
             case 3:
                 _ = LoadFilesAsync();
                 break;
+            case 7:
+                _ = LoadAdsAsync();
+                break;
             case 8:
-                _ = EnsureMapAsync();
+                _ = LoadNewsAsync();
                 break;
             case 6:
                 ClearChatUnread();
@@ -691,93 +708,1239 @@ public partial class MainWindow : Window
         StatusText.Foreground = (Brush)FindResource(bad ? "DangerBrush" : "MutedBrush");
     }
 
-    // ------------------------------------------------------------------ карта
+    // ------------------------------------------------------------------ объявления
 
-    /// <summary>Адрес веб-карты BlueMap на сервере.</summary>
-    private const string MapUrl = "http://148.113.0.9:24441/";
-
-    private bool _mapReady;
-
-    /// <summary>Поднимает WebView2 и открывает карту BlueMap.</summary>
-    private async Task EnsureMapAsync()
+    /// <summary>Все предметы Minecraft: русское название и id для иконки.</summary>
+    private static readonly (string Name, string Id)[] AdItems =
     {
-        if (_mapReady) return;
-        MapState.Text = "Карта сервера BlueMap";
+        ("Азалия", "azalea"), ("Акациевая грузовая лодка", "acacia_chest_boat"),
+        ("Акациевая дверь", "acacia_door"), ("Акациевая калитка", "acacia_fence_gate"),
+        ("Акациевая кнопка", "acacia_button"), ("Акациевая лодка", "acacia_boat"),
+        ("Акациевая нажимная плита", "acacia_pressure_plate"), ("Акациевая плита", "acacia_slab"),
+        ("Акациевая подвесная табличка", "acacia_hanging_sign"), ("Акациевая табличка", "acacia_sign"),
+        ("Акациевое бревно", "acacia_log"), ("Акациевые доски", "acacia_planks"),
+        ("Акациевые ступеньки", "acacia_stairs"), ("Акациевый забор", "acacia_fence"),
+        ("Акациевый люк", "acacia_trapdoor"), ("Акация", "acacia_wood"),
+        ("Аксолотль в ведре", "axolotl_bucket"), ("Активирующие рельсы", "activator_rail"),
+        ("Алмаз", "diamond"), ("Алмазная кирка", "diamond_pickaxe"),
+        ("Алмазная конская броня", "diamond_horse_armor"), ("Алмазная лопата", "diamond_shovel"),
+        ("Алмазная мотыга", "diamond_hoe"), ("Алмазная руда", "diamond_ore"),
+        ("Алмазные ботинки", "diamond_boots"), ("Алмазные поножи", "diamond_leggings"),
+        ("Алмазный блок", "diamond_block"), ("Алмазный меч", "diamond_sword"),
+        ("Алмазный нагрудник", "diamond_chestplate"), ("Алмазный топор", "diamond_axe"),
+        ("Алмазный шлем", "diamond_helmet"),
+        ("Алмазоносный глубинный сланец", "deepslate_diamond_ore"),
+        ("Аметистовая друза", "amethyst_cluster"), ("Аметистовый блок", "amethyst_block"),
+        ("Андезит", "andesite"), ("Андезитовая ограда", "andesite_wall"),
+        ("Андезитовая плита", "andesite_slab"), ("Андезитовые ступеньки", "andesite_stairs"),
+        ("Арбалет", "crossbow"), ("Арбуз", "melon"), ("Багровая дверь", "crimson_door"),
+        ("Багровая калитка", "crimson_fence_gate"), ("Багровая кнопка", "crimson_button"),
+        ("Багровая нажимная плита", "crimson_pressure_plate"), ("Багровая плита", "crimson_slab"),
+        ("Багровая подвесная табличка", "crimson_hanging_sign"), ("Багровая табличка", "crimson_sign"),
+        ("Багровые гифы", "crimson_hyphae"), ("Багровые доски", "crimson_planks"),
+        ("Багровые корни", "crimson_roots"), ("Багровые ступеньки", "crimson_stairs"),
+        ("Багровый гриб", "crimson_fungus"), ("Багровый забор", "crimson_fence"),
+        ("Багровый люк", "crimson_trapdoor"), ("Багровый нилий", "crimson_nylium"),
+        ("Багровый стебель", "crimson_stem"), ("Базальт", "basalt"), ("Бамбук", "bamboo"),
+        ("Бамбуковая дверь", "bamboo_door"), ("Бамбуковая калитка", "bamboo_fence_gate"),
+        ("Бамбуковая кнопка", "bamboo_button"), ("Бамбуковая мозаика", "bamboo_mosaic"),
+        ("Бамбуковая нажимная плита", "bamboo_pressure_plate"), ("Бамбуковая плита", "bamboo_slab"),
+        ("Бамбуковая подвесная табличка", "bamboo_hanging_sign"),
+        ("Бамбуковая табличка", "bamboo_sign"), ("Бамбуковые доски", "bamboo_planks"),
+        ("Бамбуковые ступеньки", "bamboo_stairs"), ("Бамбуковый забор", "bamboo_fence"),
+        ("Бамбуковый люк", "bamboo_trapdoor"), ("Бамбуковый плот", "bamboo_raft"),
+        ("Барьер", "barrier"), ("Бедрок", "bedrock"),
+        ("Белая глазурованная керамика", "white_glazed_terracotta"),
+        ("Белая керамика", "white_terracotta"), ("Белая кровать", "white_bed"),
+        ("Белая свеча", "white_candle"), ("Белая стеклянная панель", "white_stained_glass_pane"),
+        ("Белая шерсть", "white_wool"), ("Белое стекло", "white_stained_glass"),
+        ("Белый бетон", "white_concrete"), ("Белый ковёр", "white_carpet"),
+        ("Белый краситель", "white_dye"), ("Белый мешок", "white_bundle"),
+        ("Белый сухой бетон", "white_concrete_powder"), ("Белый тюльпан", "white_tulip"),
+        ("Белый флаг", "white_banner"), ("Белый шалкеровый ящик", "white_shulker_box"),
+        ("Берёза", "birch_wood"), ("Берёзовая грузовая лодка", "birch_chest_boat"),
+        ("Берёзовая дверь", "birch_door"), ("Берёзовая калитка", "birch_fence_gate"),
+        ("Берёзовая кнопка", "birch_button"), ("Берёзовая лодка", "birch_boat"),
+        ("Берёзовая нажимная плита", "birch_pressure_plate"), ("Берёзовая плита", "birch_slab"),
+        ("Берёзовая подвесная табличка", "birch_hanging_sign"), ("Берёзовая табличка", "birch_sign"),
+        ("Берёзовое бревно", "birch_log"), ("Берёзовые доски", "birch_planks"),
+        ("Берёзовые листья", "birch_leaves"), ("Берёзовые ступеньки", "birch_stairs"),
+        ("Берёзовый забор", "birch_fence"), ("Берёзовый люк", "birch_trapdoor"), ("Бирка", "name_tag"),
+        ("Бирюзовая глазурованная керамика", "cyan_glazed_terracotta"),
+        ("Бирюзовая керамика", "cyan_terracotta"), ("Бирюзовая кровать", "cyan_bed"),
+        ("Бирюзовая свеча", "cyan_candle"), ("Бирюзовая стеклянная панель", "cyan_stained_glass_pane"),
+        ("Бирюзовая шерсть", "cyan_wool"), ("Бирюзовое стекло", "cyan_stained_glass"),
+        ("Бирюзовый бетон", "cyan_concrete"), ("Бирюзовый ковёр", "cyan_carpet"),
+        ("Бирюзовый краситель", "cyan_dye"), ("Бирюзовый мешок", "cyan_bundle"),
+        ("Бирюзовый сухой бетон", "cyan_concrete_powder"), ("Бирюзовый флаг", "cyan_banner"),
+        ("Бирюзовый шалкеровый ящик", "cyan_shulker_box"), ("Бледный дуб", "pale_oak_wood"),
+        ("Бледный моховой ковёр", "pale_moss_carpet"), ("Блок бамбука", "bamboo_block"),
+        ("Блок бледного мха", "pale_moss_block"), ("Блок искажённого нароста", "warped_wart_block"),
+        ("Блок коралла-мозговика", "brain_coral_block"),
+        ("Блок коричневого гриба", "brown_mushroom_block"),
+        ("Блок красного гриба", "red_mushroom_block"), ("Блок мха", "moss_block"),
+        ("Блок мёда", "honey_block"), ("Блок мёртвого коралла-мозговика", "dead_brain_coral_block"),
+        ("Блок мёртвого огненного коралла", "dead_fire_coral_block"),
+        ("Блок мёртвого пузырчатого коралла", "dead_bubble_coral_block"),
+        ("Блок мёртвого рогового коралла", "dead_horn_coral_block"),
+        ("Блок мёртвого трубчатого коралла", "dead_tube_coral_block"),
+        ("Блок незерского нароста", "nether_wart_block"),
+        ("Блок обтёсанного бамбука", "stripped_bamboo_block"),
+        ("Блок огненного коралла", "fire_coral_block"),
+        ("Блок пузырчатого коралла", "bubble_coral_block"), ("Блок пчелиных сот", "honeycomb_block"),
+        ("Блок рогового коралла", "horn_coral_block"), ("Блок рудного железа", "raw_iron_block"),
+        ("Блок рудного золота", "raw_gold_block"), ("Блок рудной меди", "raw_copper_block"),
+        ("Блок слизи", "slime_block"), ("Блок снега", "snow_block"),
+        ("Блок сушёной ламинарии", "dried_kelp_block"),
+        ("Блок трубчатого коралла", "tube_coral_block"), ("Блок-конструктор", "structure_block"),
+        ("Большая бросянка", "big_dripleaf"),
+        ("Большегрузная весовая пластина", "heavy_weighted_pressure_plate"),
+        ("Большой аметистовый бутон", "large_amethyst_bud"), ("Бочка", "barrel"),
+        ("Бревно бледного дуба", "pale_oak_log"), ("Бревно тропического дерева", "jungle_log"),
+        ("Бревно тёмного дуба", "dark_oak_log"), ("Булава", "mace"),
+        ("Булыжная ограда", "cobblestone_wall"), ("Булыжная плита", "cobblestone_slab"),
+        ("Булыжник", "cobblestone"), ("Булыжные ступеньки", "cobblestone_stairs"), ("Бумага", "paper"),
+        ("Бутылочка", "glass_bottle"), ("Бутылочка мёда", "honey_bottle"), ("Вагонетка", "minecart"),
+        ("Вагонетка с динамитом", "tnt_minecart"),
+        ("Вагонетка с командным блоком", "command_block_minecart"), ("Ведро", "bucket"),
+        ("Ведро воды", "water_bucket"), ("Ведро лавы", "lava_bucket"), ("Ведро молока", "milk_bucket"),
+        ("Ведро с рыхлым снегом", "powder_snow_bucket"),
+        ("Веерный коралл-мозговик", "brain_coral_fan"), ("Веерный огненный коралл", "fire_coral_fan"),
+        ("Веерный пузырчатый коралл", "bubble_coral_fan"),
+        ("Веерный роговый коралл", "horn_coral_fan"), ("Веерный трубчатый коралл", "tube_coral_fan"),
+        ("Верстак", "crafting_table"), ("Весовая пластина", "light_weighted_pressure_plate"),
+        ("Вихревой стержень", "breeze_rod"), ("Вишня", "cherry_wood"),
+        ("Вишнёвая грузовая лодка", "cherry_chest_boat"), ("Вишнёвая дверь", "cherry_door"),
+        ("Вишнёвая калитка", "cherry_fence_gate"), ("Вишнёвая кнопка", "cherry_button"),
+        ("Вишнёвая лодка", "cherry_boat"), ("Вишнёвая нажимная плита", "cherry_pressure_plate"),
+        ("Вишнёвая плита", "cherry_slab"), ("Вишнёвая подвесная табличка", "cherry_hanging_sign"),
+        ("Вишнёвая табличка", "cherry_sign"), ("Вишнёвое бревно", "cherry_log"),
+        ("Вишнёвые доски", "cherry_planks"), ("Вишнёвые листья", "cherry_leaves"),
+        ("Вишнёвые ступеньки", "cherry_stairs"), ("Вишнёвый забор", "cherry_fence"),
+        ("Вишнёвый люк", "cherry_trapdoor"), ("Возвратный компас", "recovery_compass"),
+        ("Волчья броня", "wolf_armor"), ("Воронка", "hopper"),
+        ("Вощёная медная дверь", "waxed_copper_door"), ("Вощёная медная лампа", "waxed_copper_bulb"),
+        ("Вощёная медная решётка", "waxed_copper_grate"),
+        ("Вощёная окисленная медная дверь", "waxed_oxidized_copper_door"),
+        ("Вощёная окисленная медная лампа", "waxed_oxidized_copper_bulb"),
+        ("Вощёная окисленная медная решётка", "waxed_oxidized_copper_grate"),
+        ("Вощёная окисленная резная медная плита", "waxed_oxidized_cut_copper_slab"),
+        ("Вощёная потемневшая медная дверь", "waxed_exposed_copper_door"),
+        ("Вощёная потемневшая медная лампа", "waxed_exposed_copper_bulb"),
+        ("Вощёная потемневшая медная решётка", "waxed_exposed_copper_grate"),
+        ("Вощёная потемневшая резная медная плита", "waxed_exposed_cut_copper_slab"),
+        ("Вощёная резная медная плита", "waxed_cut_copper_slab"),
+        ("Вощёная состаренная медная дверь", "waxed_weathered_copper_door"),
+        ("Вощёная состаренная медная лампа", "waxed_weathered_copper_bulb"),
+        ("Вощёная состаренная медная решётка", "waxed_weathered_copper_grate"),
+        ("Вощёная состаренная резная медная плита", "waxed_weathered_cut_copper_slab"),
+        ("Вощёные окисленные резные медные ступеньки", "waxed_oxidized_cut_copper_stairs"),
+        ("Вощёные потемневшие резные медные ступеньки", "waxed_exposed_cut_copper_stairs"),
+        ("Вощёные резные медные ступеньки", "waxed_cut_copper_stairs"),
+        ("Вощёные состаренные резные медные ступеньки", "waxed_weathered_cut_copper_stairs"),
+        ("Вощёный медный блок", "waxed_copper_block"), ("Вощёный медный люк", "waxed_copper_trapdoor"),
+        ("Вощёный окисленный медный блок", "waxed_oxidized_copper"),
+        ("Вощёный окисленный медный люк", "waxed_oxidized_copper_trapdoor"),
+        ("Вощёный окисленный резной медный блок", "waxed_oxidized_cut_copper"),
+        ("Вощёный окисленный точёный медный блок", "waxed_oxidized_chiseled_copper"),
+        ("Вощёный потемневший медный блок", "waxed_exposed_copper"),
+        ("Вощёный потемневший медный люк", "waxed_exposed_copper_trapdoor"),
+        ("Вощёный потемневший резной медный блок", "waxed_exposed_cut_copper"),
+        ("Вощёный потемневший точёный медный блок", "waxed_exposed_chiseled_copper"),
+        ("Вощёный резной медный блок", "waxed_cut_copper"),
+        ("Вощёный состаренный медный блок", "waxed_weathered_copper"),
+        ("Вощёный состаренный медный люк", "waxed_weathered_copper_trapdoor"),
+        ("Вощёный состаренный резной медный блок", "waxed_weathered_cut_copper"),
+        ("Вощёный состаренный точёный медный блок", "waxed_weathered_chiseled_copper"),
+        ("Вощёный точёный медный блок", "waxed_chiseled_copper"), ("Выбрасыватель", "dropper"),
+        ("Вырезанная тыква", "carved_pumpkin"), ("Высокая трава", "tall_grass"),
+        ("Вьющаяся лоза", "twisting_vines"), ("Гладкий базальт", "smooth_basalt"),
+        ("Гладкий камень", "smooth_stone"), ("Гладкий кварц", "smooth_quartz"),
+        ("Гладкий красный песчаник", "smooth_red_sandstone"), ("Гладкий песчаник", "smooth_sandstone"),
+        ("Глина", "clay"), ("Глиняный черепок «Вихрь»", "guster_pottery_sherd"),
+        ("Глиняный черепок «Вой»", "howl_pottery_sherd"),
+        ("Глиняный черепок «Друг»", "friend_pottery_sherd"),
+        ("Глиняный черепок «Зельевар»", "brewer_pottery_sherd"),
+        ("Глиняный черепок «Изобилие»", "plenty_pottery_sherd"),
+        ("Глиняный черепок «Исследователь»", "explorer_pottery_sherd"),
+        ("Глиняный черепок «Клинок»", "blade_pottery_sherd"),
+        ("Глиняный черепок «Лучник»", "archer_pottery_sherd"),
+        ("Глиняный черепок «Награда»", "prize_pottery_sherd"),
+        ("Глиняный черепок «Обтёсывание»", "scrape_pottery_sherd"),
+        ("Глиняный черепок «Пламя»", "burn_pottery_sherd"),
+        ("Глиняный черепок «Поток»", "flow_pottery_sherd"),
+        ("Глиняный черепок «Разбитое сердце»", "heartbreak_pottery_sherd"),
+        ("Глиняный черепок «Руки вверх»", "arms_up_pottery_sherd"),
+        ("Глиняный черепок «Рыбак»", "angler_pottery_sherd"),
+        ("Глиняный черепок «Сердце»", "heart_pottery_sherd"),
+        ("Глиняный черепок «Скорбь»", "mourner_pottery_sherd"),
+        ("Глиняный черепок «Сноп»", "sheaf_pottery_sherd"),
+        ("Глиняный черепок «Угроза»", "danger_pottery_sherd"),
+        ("Глиняный черепок «Укрытие»", "shelter_pottery_sherd"),
+        ("Глиняный черепок «Череп»", "skull_pottery_sherd"),
+        ("Глиняный черепок «Шахтёр»", "miner_pottery_sherd"),
+        ("Глиняный черепок «Шмыг»", "snort_pottery_sherd"),
+        ("Глубинносланцевые кирпичи", "deepslate_bricks"),
+        ("Глубинносланцевый плитняк", "deepslate_tiles"), ("Глубинный сланец", "deepslate"),
+        ("Гнилая плоть", "rotten_flesh"), ("Голова дракона", "dragon_head"),
+        ("Голова зомби", "zombie_head"), ("Голова игрока", "player_head"),
+        ("Голова крипера", "creeper_head"), ("Голова пиглина", "piglin_head"),
+        ("Головастик в ведре", "tadpole_bucket"),
+        ("Голубая глазурованная керамика", "light_blue_glazed_terracotta"),
+        ("Голубая керамика", "light_blue_terracotta"), ("Голубая кровать", "light_blue_bed"),
+        ("Голубая свеча", "light_blue_candle"),
+        ("Голубая стеклянная панель", "light_blue_stained_glass_pane"),
+        ("Голубая шерсть", "light_blue_wool"), ("Голубое стекло", "light_blue_stained_glass"),
+        ("Голубой бетон", "light_blue_concrete"), ("Голубой ковёр", "light_blue_carpet"),
+        ("Голубой краситель", "light_blue_dye"), ("Голубой мешок", "light_blue_bundle"),
+        ("Голубой сухой бетон", "light_blue_concrete_powder"), ("Голубой флаг", "light_blue_banner"),
+        ("Голубой шалкеровый ящик", "light_blue_shulker_box"), ("Гравий", "gravel"),
+        ("Гранит", "granite"), ("Гранитная ограда", "granite_wall"),
+        ("Гранитная плита", "granite_slab"), ("Гранитные ступеньки", "granite_stairs"),
+        ("Грибосвет", "shroomlight"), ("Громоотвод", "lightning_rod"),
+        ("Грузовая вагонетка", "chest_minecart"),
+        ("Грузовая лодка из бледного дуба", "pale_oak_chest_boat"),
+        ("Грузовая лодка из тропического дерева", "jungle_chest_boat"),
+        ("Грузовая лодка из тёмного дуба", "dark_oak_chest_boat"),
+        ("Грузовой бамбуковый плот", "bamboo_chest_raft"),
+        ("Грязные мангровые корни", "muddy_mangrove_roots"), ("Грязь", "mud"), ("Губка", "sponge"),
+        ("Датчик дневного света", "daylight_detector"), ("Дверь из бледного дуба", "pale_oak_door"),
+        ("Дверь из тропического дерева", "jungle_door"), ("Дверь из тёмного дуба", "dark_oak_door"),
+        ("Деревянная кирка", "wooden_pickaxe"), ("Деревянная лопата", "wooden_shovel"),
+        ("Деревянная мотыга", "wooden_hoe"), ("Деревянный меч", "wooden_sword"),
+        ("Деревянный топор", "wooden_axe"), ("Динамит", "tnt"), ("Диорит", "diorite"),
+        ("Диоритовая ограда", "diorite_wall"), ("Диоритовая плита", "diorite_slab"),
+        ("Диоритовые ступеньки", "diorite_stairs"), ("Доски из бледного дуба", "pale_oak_planks"),
+        ("Доски из тропического дерева", "jungle_planks"),
+        ("Доски из тёмного дуба", "dark_oak_planks"), ("Драконье дыхание", "dragon_breath"),
+        ("Древесный уголь", "charcoal"), ("Древние обломки", "ancient_debris"), ("Дуб", "oak_wood"),
+        ("Дубовая грузовая лодка", "oak_chest_boat"), ("Дубовая дверь", "oak_door"),
+        ("Дубовая калитка", "oak_fence_gate"), ("Дубовая кнопка", "oak_button"),
+        ("Дубовая лодка", "oak_boat"), ("Дубовая нажимная плита", "oak_pressure_plate"),
+        ("Дубовая плита", "oak_slab"), ("Дубовая подвесная табличка", "oak_hanging_sign"),
+        ("Дубовая табличка", "oak_sign"), ("Дубовое бревно", "oak_log"),
+        ("Дубовые доски", "oak_planks"), ("Дубовые листья", "oak_leaves"),
+        ("Дубовые ступеньки", "oak_stairs"), ("Дубовый забор", "oak_fence"),
+        ("Дубовый люк", "oak_trapdoor"), ("Дёрн", "grass_block"),
+        ("Еловая грузовая лодка", "spruce_chest_boat"), ("Еловая дверь", "spruce_door"),
+        ("Еловая калитка", "spruce_fence_gate"), ("Еловая кнопка", "spruce_button"),
+        ("Еловая лодка", "spruce_boat"), ("Еловая нажимная плита", "spruce_pressure_plate"),
+        ("Еловая плита", "spruce_slab"), ("Еловая подвесная табличка", "spruce_hanging_sign"),
+        ("Еловая табличка", "spruce_sign"), ("Еловое бревно", "spruce_log"),
+        ("Еловые доски", "spruce_planks"), ("Еловые ступеньки", "spruce_stairs"),
+        ("Еловый забор", "spruce_fence"), ("Еловый люк", "spruce_trapdoor"), ("Ель", "spruce_wood"),
+        ("Жареная баранина", "cooked_mutton"), ("Жареная крольчатина", "cooked_rabbit"),
+        ("Жареная курица", "cooked_chicken"), ("Жареная свинина", "cooked_porkchop"),
+        ("Жареная треска", "cooked_cod"), ("Жареный лосось", "cooked_salmon"),
+        ("Железная дверь", "iron_door"), ("Железная кирка", "iron_pickaxe"),
+        ("Железная конская броня", "iron_horse_armor"), ("Железная лопата", "iron_shovel"),
+        ("Железная мотыга", "iron_hoe"), ("Железная руда", "iron_ore"),
+        ("Железные ботинки", "iron_boots"), ("Железные поножи", "iron_leggings"),
+        ("Железные прутья", "iron_bars"), ("Железный блок", "iron_block"),
+        ("Железный люк", "iron_trapdoor"), ("Железный меч", "iron_sword"),
+        ("Железный нагрудник", "iron_chestplate"), ("Железный слиток", "iron_ingot"),
+        ("Железный топор", "iron_axe"), ("Железный шлем", "iron_helmet"),
+        ("Железоносный глубинный сланец", "deepslate_iron_ore"),
+        ("Жёлтая глазурованная керамика", "yellow_glazed_terracotta"),
+        ("Жёлтая керамика", "yellow_terracotta"), ("Жёлтая кровать", "yellow_bed"),
+        ("Жёлтая свеча", "yellow_candle"), ("Жёлтая стеклянная панель", "yellow_stained_glass_pane"),
+        ("Жёлтая шерсть", "yellow_wool"), ("Жёлтое стекло", "yellow_stained_glass"),
+        ("Жёлтый бетон", "yellow_concrete"), ("Жёлтый ковёр", "yellow_carpet"),
+        ("Жёлтый краситель", "yellow_dye"), ("Жёлтый мешок", "yellow_bundle"),
+        ("Жёлтый сухой бетон", "yellow_concrete_powder"), ("Жёлтый флаг", "yellow_banner"),
+        ("Жёлтый шалкеровый ящик", "yellow_shulker_box"), ("Забор из бледного дуба", "pale_oak_fence"),
+        ("Забор из незерского кирпича", "nether_brick_fence"),
+        ("Забор из тропического дерева", "jungle_fence"), ("Забор из тёмного дуба", "dark_oak_fence"),
+        ("Завершённая книга", "written_book"), ("Загадочное рагу", "suspicious_stew"),
+        ("Загрузочная вагонетка", "hopper_minecart"), ("Закрытая глазалия", "closed_eyeblossom"),
+        ("Замшелая булыжная ограда", "mossy_cobblestone_wall"),
+        ("Замшелая булыжная плита", "mossy_cobblestone_slab"),
+        ("Замшелые булыжные ступеньки", "mossy_cobblestone_stairs"),
+        ("Замшелые каменные кирпичи", "mossy_stone_bricks"),
+        ("Замшелый булыжник", "mossy_cobblestone"),
+        ("Заражённые замшелые каменные кирпичи", "infested_mossy_stone_bricks"),
+        ("Заражённые каменные кирпичи", "infested_stone_bricks"),
+        ("Заражённые потрескавшиеся каменные кирпичи", "infested_cracked_stone_bricks"),
+        ("Заражённые резные каменные кирпичи", "infested_chiseled_stone_bricks"),
+        ("Заражённый булыжник", "infested_cobblestone"),
+        ("Заражённый глубинный сланец", "infested_deepslate"), ("Заражённый камень", "infested_stone"),
+        ("Заряд ветра", "wind_charge"), ("Зачарованное золотое яблоко", "enchanted_golden_apple"),
+        ("Звезда Незера", "nether_star"), ("Зельеварка", "brewing_stand"),
+        ("Зелёная глазурованная керамика", "green_glazed_terracotta"),
+        ("Зелёная керамика", "green_terracotta"), ("Зелёная кровать", "green_bed"),
+        ("Зелёная свеча", "green_candle"), ("Зелёная стеклянная панель", "green_stained_glass_pane"),
+        ("Зелёная шерсть", "green_wool"), ("Зелёное стекло", "green_stained_glass"),
+        ("Зелёный бетон", "green_concrete"), ("Зелёный ковёр", "green_carpet"),
+        ("Зелёный краситель", "green_dye"), ("Зелёный мешок", "green_bundle"),
+        ("Зелёный сухой бетон", "green_concrete_powder"), ("Зелёный флаг", "green_banner"),
+        ("Зелёный шалкеровый ящик", "green_shulker_box"), ("Земля", "dirt"),
+        ("Зловещая бутылочка", "ominous_bottle"), ("Зловещий ключ испытаний", "ominous_trial_key"),
+        ("Золотая кирка", "golden_pickaxe"), ("Золотая конская броня", "golden_horse_armor"),
+        ("Золотая лопата", "golden_shovel"), ("Золотая морковь", "golden_carrot"),
+        ("Золотая мотыга", "golden_hoe"), ("Золотая руда", "gold_ore"),
+        ("Золотое яблоко", "golden_apple"), ("Золотой блок", "gold_block"),
+        ("Золотой меч", "golden_sword"), ("Золотой нагрудник", "golden_chestplate"),
+        ("Золотой слиток", "gold_ingot"), ("Золотой топор", "golden_axe"),
+        ("Золотой шлем", "golden_helmet"), ("Золотоносный глубинный сланец", "deepslate_gold_ore"),
+        ("Золотые ботинки", "golden_boots"), ("Золотые поножи", "golden_leggings"),
+        ("Золочёный чернит", "gilded_blackstone"), ("Иглобрюх", "pufferfish"),
+        ("Иглобрюх в ведре", "pufferfish_bucket"), ("Изумруд", "emerald"),
+        ("Изумрудная руда", "emerald_ore"), ("Изумрудный блок", "emerald_block"),
+        ("Изумрудоносный глубинный сланец", "deepslate_emerald_ore"),
+        ("Искажённая дверь", "warped_door"), ("Искажённая калитка", "warped_fence_gate"),
+        ("Искажённая кнопка", "warped_button"), ("Искажённая нажимная плита", "warped_pressure_plate"),
+        ("Искажённая плита", "warped_slab"), ("Искажённая подвесная табличка", "warped_hanging_sign"),
+        ("Искажённая табличка", "warped_sign"), ("Искажённые гифы", "warped_hyphae"),
+        ("Искажённые доски", "warped_planks"), ("Искажённые корни", "warped_roots"),
+        ("Искажённые ступеньки", "warped_stairs"), ("Искажённый гриб", "warped_fungus"),
+        ("Искажённый забор", "warped_fence"), ("Искажённый люк", "warped_trapdoor"),
+        ("Искажённый нилий", "warped_nylium"), ("Искажённый стебель", "warped_stem"),
+        ("Какао-бобы", "cocoa_beans"), ("Кактус", "cactus"),
+        ("Калитка из бледного дуба", "pale_oak_fence_gate"),
+        ("Калитка из тропического дерева", "jungle_fence_gate"),
+        ("Калитка из тёмного дуба", "dark_oak_fence_gate"), ("Кальцит", "calcite"),
+        ("Каменистая земля", "coarse_dirt"), ("Каменная кирка", "stone_pickaxe"),
+        ("Каменная кнопка", "stone_button"), ("Каменная лопата", "stone_shovel"),
+        ("Каменная мотыга", "stone_hoe"), ("Каменная нажимная плита", "stone_pressure_plate"),
+        ("Каменная плита", "stone_slab"), ("Каменные кирпичи", "stone_bricks"),
+        ("Каменные ступеньки", "stone_stairs"), ("Каменный меч", "stone_sword"),
+        ("Каменный топор", "stone_axe"), ("Камень", "stone"), ("Камнерез", "stonecutter"),
+        ("Капельник", "pointed_dripstone"), ("Карта", "filled_map"), ("Картина", "painting"),
+        ("Картофель", "potato"), ("Кафедра", "lectern"), ("Кварцевая колонна", "quartz_pillar"),
+        ("Кварцевая плита", "quartz_slab"), ("Кварцевые кирпичи", "quartz_bricks"),
+        ("Кварцевые ступеньки", "quartz_stairs"), ("Кварцевый блок", "quartz_block"),
+        ("Кирпич", "brick"), ("Кирпичи", "bricks"), ("Кирпичная ограда", "brick_wall"),
+        ("Кирпичная плита", "brick_slab"), ("Кирпичные ступеньки", "brick_stairs"), ("Кисть", "brush"),
+        ("Ключ испытаний", "trial_key"), ("Книга", "book"), ("Книга знаний", "knowledge_book"),
+        ("Книга и перо", "writable_book"), ("Книжная полка", "bookshelf"),
+        ("Кнопка из бледного дуба", "pale_oak_button"),
+        ("Кнопка из полированного чернита", "polished_blackstone_button"),
+        ("Кнопка из тропического дерева", "jungle_button"),
+        ("Кнопка из тёмного дуба", "dark_oak_button"), ("Кожа", "leather"),
+        ("Кожаная конская броня", "leather_horse_armor"), ("Кожаная куртка", "leather_chestplate"),
+        ("Кожаные ботинки", "leather_boots"), ("Кожаные штаны", "leather_leggings"),
+        ("Кожаный шлем", "leather_helmet"), ("Козий рог", "goat_horn"), ("Койф", "chainmail_helmet"),
+        ("Колокол", "bell"), ("Колотый глубинный сланец", "cobbled_deepslate"),
+        ("Кольчуга", "chainmail_chestplate"), ("Кольчужные ботинки", "chainmail_boots"),
+        ("Кольчужные поножи", "chainmail_leggings"), ("Командный блок", "command_block"),
+        ("Комок глины", "clay_ball"), ("Компас", "compass"), ("Компостница", "composter"),
+        ("Коптильня", "smoker"), ("Коралл-мозговик", "brain_coral"),
+        ("Коричневая глазурованная керамика", "brown_glazed_terracotta"),
+        ("Коричневая керамика", "brown_terracotta"), ("Коричневая кровать", "brown_bed"),
+        ("Коричневая свеча", "brown_candle"),
+        ("Коричневая стеклянная панель", "brown_stained_glass_pane"),
+        ("Коричневая шерсть", "brown_wool"), ("Коричневое стекло", "brown_stained_glass"),
+        ("Коричневый бетон", "brown_concrete"), ("Коричневый гриб", "brown_mushroom"),
+        ("Коричневый ковёр", "brown_carpet"), ("Коричневый краситель", "brown_dye"),
+        ("Коричневый мешок", "brown_bundle"), ("Коричневый сухой бетон", "brown_concrete_powder"),
+        ("Коричневый флаг", "brown_banner"), ("Коричневый шалкеровый ящик", "brown_shulker_box"),
+        ("Корнистая земля", "rooted_dirt"), ("Костная мука", "bone_meal"),
+        ("Костный блок", "bone_block"), ("Кость", "bone"), ("Костёр", "campfire"),
+        ("Костёр душ", "soul_campfire"), ("Котёл", "cauldron"),
+        ("Красная глазурованная керамика", "red_glazed_terracotta"),
+        ("Красная керамика", "red_terracotta"), ("Красная кровать", "red_bed"),
+        ("Красная свеча", "red_candle"), ("Красная стеклянная панель", "red_stained_glass_pane"),
+        ("Красная шерсть", "red_wool"), ("Красное стекло", "red_stained_glass"),
+        ("Красные незерские кирпичи", "red_nether_bricks"), ("Красный бетон", "red_concrete"),
+        ("Красный гриб", "red_mushroom"), ("Красный ковёр", "red_carpet"),
+        ("Красный краситель", "red_dye"), ("Красный мешок", "red_bundle"),
+        ("Красный песок", "red_sand"), ("Красный песчаник", "red_sandstone"),
+        ("Красный сухой бетон", "red_concrete_powder"), ("Красный тюльпан", "red_tulip"),
+        ("Красный флаг", "red_banner"), ("Красный шалкеровый ящик", "red_shulker_box"),
+        ("Кремень", "flint"), ("Кристалл призмарина", "prismarine_crystals"),
+        ("Кристалл Энда", "end_crystal"), ("Кроличья лапка", "rabbit_foot"),
+        ("Кроличья шкурка", "rabbit_hide"), ("Крюк", "tripwire_hook"), ("Кувшинка", "lily_pad"),
+        ("Кувшинница", "pitcher_plant"), ("Кузнечный шаблон", "bolt_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "coast_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "dune_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "eye_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "flow_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "host_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "netherite_upgrade_smithing_template"),
+        ("Кузнечный шаблон", "raiser_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "rib_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "sentry_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "shaper_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "silence_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "snout_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "spire_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "tide_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "vex_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "ward_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "wayfinder_armor_trim_smithing_template"),
+        ("Кузнечный шаблон", "wild_armor_trim_smithing_template"), ("Курятина", "chicken"),
+        ("Кусочек железа", "iron_nugget"), ("Кусочек золота", "gold_nugget"),
+        ("Лазурит", "lapis_lazuli"), ("Лазуритовая руда", "lapis_ore"),
+        ("Лазуритовый блок", "lapis_block"),
+        ("Лазуритоносный глубинный сланец", "deepslate_lapis_ore"),
+        ("Лаймовая глазурованная керамика", "lime_glazed_terracotta"),
+        ("Лаймовая керамика", "lime_terracotta"), ("Лаймовая кровать", "lime_bed"),
+        ("Лаймовая свеча", "lime_candle"), ("Лаймовая стеклянная панель", "lime_stained_glass_pane"),
+        ("Лаймовая шерсть", "lime_wool"), ("Лаймовое стекло", "lime_stained_glass"),
+        ("Лаймовый бетон", "lime_concrete"), ("Лаймовый ковёр", "lime_carpet"),
+        ("Лаймовый краситель", "lime_dye"), ("Лаймовый мешок", "lime_bundle"),
+        ("Лаймовый сухой бетон", "lime_concrete_powder"), ("Лаймовый флаг", "lime_banner"),
+        ("Лаймовый шалкеровый ящик", "lime_shulker_box"), ("Ламинария", "kelp"),
+        ("Ландыш", "lily_of_the_valley"), ("Лестница", "ladder"), ("Лианы", "vine"),
+        ("Липкий поршень", "sticky_piston"), ("Листья азалии", "azalea_leaves"),
+        ("Листья акации", "acacia_leaves"), ("Листья бледного дуба", "pale_oak_leaves"),
+        ("Листья тропического дерева", "jungle_leaves"), ("Листья тёмного дуба", "dark_oak_leaves"),
+        ("Листья цветущей азалии", "flowering_azalea_leaves"),
+        ("Лодка из бледного дуба", "pale_oak_boat"), ("Лодка из тропического дерева", "jungle_boat"),
+        ("Лодка из тёмного дуба", "dark_oak_boat"), ("Ломтик арбуза", "melon_slice"),
+        ("Лосось в ведре", "salmon_bucket"), ("Лук", "bow"), ("Лук-батун", "allium"),
+        ("Люк из бледного дуба", "pale_oak_trapdoor"),
+        ("Люк из тропического дерева", "jungle_trapdoor"),
+        ("Люк из тёмного дуба", "dark_oak_trapdoor"), ("Лягушачья икра", "frogspawn"), ("Лёд", "ice"),
+        ("Магма", "magma_block"), ("Магнетит", "lodestone"), ("Мак", "poppy"),
+        ("Малахитовая квампа", "verdant_froglight"), ("Маленькая бросянка", "small_dripleaf"),
+        ("Малый аметистовый бутон", "small_amethyst_bud"),
+        ("Мангровая грузовая лодка", "mangrove_chest_boat"), ("Мангровая дверь", "mangrove_door"),
+        ("Мангровая калитка", "mangrove_fence_gate"), ("Мангровая кнопка", "mangrove_button"),
+        ("Мангровая лодка", "mangrove_boat"), ("Мангровая нажимная плита", "mangrove_pressure_plate"),
+        ("Мангровая плита", "mangrove_slab"),
+        ("Мангровая подвесная табличка", "mangrove_hanging_sign"),
+        ("Мангровая табличка", "mangrove_sign"), ("Мангровое бревно", "mangrove_log"),
+        ("Мангровое дерево", "mangrove_wood"), ("Мангровые доски", "mangrove_planks"),
+        ("Мангровые корни", "mangrove_roots"), ("Мангровые листья", "mangrove_leaves"),
+        ("Мангровые ступеньки", "mangrove_stairs"), ("Мангровый забор", "mangrove_fence"),
+        ("Мангровый люк", "mangrove_trapdoor"), ("Мангровый отросток", "mangrove_propagule"),
+        ("Маринованный паучий глаз", "fermented_spider_eye"), ("Маяк", "beacon"),
+        ("Меденосный глубинный сланец", "deepslate_copper_ore"), ("Медная дверь", "copper_door"),
+        ("Медная лампа", "copper_bulb"), ("Медная решётка", "copper_grate"),
+        ("Медная руда", "copper_ore"), ("Медный блок", "copper_block"),
+        ("Медный люк", "copper_trapdoor"), ("Медный слиток", "copper_ingot"),
+        ("Мембрана фантома", "phantom_membrane"), ("Мешок", "bundle"), ("Миска", "bowl"),
+        ("Мицелий", "mycelium"), ("Мишень", "target"), ("Мокрая губка", "wet_sponge"),
+        ("Морковь", "carrot"), ("Морская трава", "seagrass"), ("Морской источник", "conduit"),
+        ("Морской огурец", "sea_pickle"), ("Морской фонарь", "sea_lantern"),
+        ("Моховой ковёр", "moss_carpet"), ("Мёртвый веерный коралл-мозговик", "dead_brain_coral_fan"),
+        ("Мёртвый веерный огненный коралл", "dead_fire_coral_fan"),
+        ("Мёртвый веерный пузырчатый коралл", "dead_bubble_coral_fan"),
+        ("Мёртвый веерный роговый коралл", "dead_horn_coral_fan"),
+        ("Мёртвый веерный трубчатый коралл", "dead_tube_coral_fan"),
+        ("Мёртвый коралл-мозговик", "dead_brain_coral"), ("Мёртвый куст", "dead_bush"),
+        ("Мёртвый огненный коралл", "dead_fire_coral"),
+        ("Мёртвый пузырчатый коралл", "dead_bubble_coral"),
+        ("Мёртвый роговый коралл", "dead_horn_coral"), ("Мёртвый трубчатый коралл", "dead_tube_coral"),
+        ("Наблюдатель", "observer"), ("Навершие булавы", "heavy_core"),
+        ("Нажимная плита из бледного дуба", "pale_oak_pressure_plate"),
+        ("Нажимная плита из полированного чернита", "polished_blackstone_pressure_plate"),
+        ("Нажимная плита из тропического дерева", "jungle_pressure_plate"),
+        ("Нажимная плита из тёмного дуба", "dark_oak_pressure_plate"), ("Наковальня", "anvil"),
+        ("Натёчный камень", "dripstone_block"), ("Незер-кварц", "quartz"),
+        ("Незер-кварцевая руда", "nether_quartz_ore"), ("Незерак", "netherrack"),
+        ("Незеритовая кирка", "netherite_pickaxe"), ("Незеритовая лопата", "netherite_shovel"),
+        ("Незеритовая мотыга", "netherite_hoe"), ("Незеритовые ботинки", "netherite_boots"),
+        ("Незеритовые поножи", "netherite_leggings"), ("Незеритовый блок", "netherite_block"),
+        ("Незеритовый лом", "netherite_scrap"), ("Незеритовый меч", "netherite_sword"),
+        ("Незеритовый нагрудник", "netherite_chestplate"), ("Незеритовый слиток", "netherite_ingot"),
+        ("Незеритовый топор", "netherite_axe"), ("Незеритовый шлем", "netherite_helmet"),
+        ("Незерская золотая руда", "nether_gold_ore"), ("Незерские кирпичи", "nether_bricks"),
+        ("Незерские ростки", "nether_sprouts"), ("Незерский кирпич", "nether_brick"),
+        ("Незерский нарост", "nether_wart"), ("Низкая трава", "short_grass"), ("Нить", "string"),
+        ("Ножка гриба", "mushroom_stem"), ("Ножницы", "shears"), ("Нотный блок", "note_block"),
+        ("Обсидиан", "obsidian"), ("Обтёсанная акациевая древесина", "stripped_acacia_wood"),
+        ("Обтёсанная берёзовая древесина", "stripped_birch_wood"),
+        ("Обтёсанная вишнёвая древесина", "stripped_cherry_wood"),
+        ("Обтёсанная древесина бледного дуба", "stripped_pale_oak_wood"),
+        ("Обтёсанная древесина тёмного дуба", "stripped_dark_oak_wood"),
+        ("Обтёсанная дубовая древесина", "stripped_oak_wood"),
+        ("Обтёсанная еловая древесина", "stripped_spruce_wood"),
+        ("Обтёсанная мангровая древесина", "stripped_mangrove_wood"),
+        ("Обтёсанная тропическая древесина", "stripped_jungle_wood"),
+        ("Обтёсанное акациевое бревно", "stripped_acacia_log"),
+        ("Обтёсанное берёзовое бревно", "stripped_birch_log"),
+        ("Обтёсанное бревно бледного дуба", "stripped_pale_oak_log"),
+        ("Обтёсанное бревно тропического дерева", "stripped_jungle_log"),
+        ("Обтёсанное бревно тёмного дуба", "stripped_dark_oak_log"),
+        ("Обтёсанное вишнёвое бревно", "stripped_cherry_log"),
+        ("Обтёсанное дубовое бревно", "stripped_oak_log"),
+        ("Обтёсанное еловое бревно", "stripped_spruce_log"),
+        ("Обтёсанное мангровое бревно", "stripped_mangrove_log"), ("Огненный заряд", "fire_charge"),
+        ("Огненный коралл", "fire_coral"), ("Огненный порошок", "blaze_powder"),
+        ("Огненный стержень", "blaze_rod"), ("Огниво", "flint_and_steel"),
+        ("Ограда из глубинносланцевого кирпича", "deepslate_brick_wall"),
+        ("Ограда из глубинносланцевого плитняка", "deepslate_tile_wall"),
+        ("Ограда из замшелого каменного кирпича", "mossy_stone_brick_wall"),
+        ("Ограда из каменного кирпича", "stone_brick_wall"),
+        ("Ограда из колотого глубинного сланца", "cobbled_deepslate_wall"),
+        ("Ограда из красного незерского кирпича", "red_nether_brick_wall"),
+        ("Ограда из красного песчаника", "red_sandstone_wall"),
+        ("Ограда из незерского кирпича", "nether_brick_wall"),
+        ("Ограда из полированно-чернитного кирпича", "polished_blackstone_brick_wall"),
+        ("Ограда из полированного глубинного сланца", "polished_deepslate_wall"),
+        ("Ограда из полированного туфа", "polished_tuff_wall"),
+        ("Ограда из полированного чернита", "polished_blackstone_wall"),
+        ("Ограда из смоляного кирпича", "resin_brick_wall"),
+        ("Ограда из туфового кирпича", "tuff_brick_wall"),
+        ("Ограда из эндернякового кирпича", "end_stone_brick_wall"), ("Одуванчик", "dandelion"),
+        ("Окаменевшая дубовая плита", "petrified_oak_slab"),
+        ("Окисленная медная дверь", "oxidized_copper_door"),
+        ("Окисленная медная лампа", "oxidized_copper_bulb"),
+        ("Окисленная медная решётка", "oxidized_copper_grate"),
+        ("Окисленная резная медная плита", "oxidized_cut_copper_slab"),
+        ("Окисленные резные медные ступеньки", "oxidized_cut_copper_stairs"),
+        ("Окисленный медный блок", "oxidized_copper"),
+        ("Окисленный медный люк", "oxidized_copper_trapdoor"),
+        ("Окисленный резной медный блок", "oxidized_cut_copper"),
+        ("Окисленный точёный медный блок", "oxidized_chiseled_copper"), ("Око Эндера", "ender_eye"),
+        ("Оранжевая глазурованная керамика", "orange_glazed_terracotta"),
+        ("Оранжевая керамика", "orange_terracotta"), ("Оранжевая кровать", "orange_bed"),
+        ("Оранжевая свеча", "orange_candle"),
+        ("Оранжевая стеклянная панель", "orange_stained_glass_pane"),
+        ("Оранжевая шерсть", "orange_wool"), ("Оранжевое стекло", "orange_stained_glass"),
+        ("Оранжевый бетон", "orange_concrete"), ("Оранжевый ковёр", "orange_carpet"),
+        ("Оранжевый краситель", "orange_dye"), ("Оранжевый мешок", "orange_bundle"),
+        ("Оранжевый сухой бетон", "orange_concrete_powder"), ("Оранжевый тюльпан", "orange_tulip"),
+        ("Оранжевый флаг", "orange_banner"), ("Оранжевый шалкеровый ящик", "orange_shulker_box"),
+        ("Осколок аметиста", "amethyst_shard"), ("Осколок пластинки", "disc_fragment_5"),
+        ("Осколок призмарина", "prismarine_shard"), ("Осколок эха", "echo_shard"),
+        ("Откалиброванный скалк-сенсор", "calibrated_sculk_sensor"),
+        ("Охристая квампа", "ochre_froglight"), ("Очищенные багровые гифы", "stripped_crimson_hyphae"),
+        ("Очищенные искажённые гифы", "stripped_warped_hyphae"),
+        ("Очищенный багровый стебель", "stripped_crimson_stem"),
+        ("Очищенный искажённый стебель", "stripped_warped_stem"), ("Пазл", "jigsaw"),
+        ("Палка", "stick"), ("Палочка отладки", "debug_stick"), ("Панцирь шалкера", "shulker_shell"),
+        ("Папоротник", "fern"), ("Паутина", "cobweb"), ("Паучий глаз", "spider_eye"),
+        ("Пашня", "farmland"), ("Перламутровая квампа", "pearlescent_froglight"), ("Перо", "feather"),
+        ("Песок", "sand"), ("Песок душ", "soul_sand"), ("Песчаник", "sandstone"),
+        ("Песчаниковая ограда", "sandstone_wall"), ("Песчаниковая плита", "sandstone_slab"),
+        ("Песчаниковые ступеньки", "sandstone_stairs"), ("Печенье", "cookie"), ("Печь", "furnace"),
+        ("Печёный картофель", "baked_potato"), ("Пиленый красный песчаник", "cut_red_sandstone"),
+        ("Пиленый песчаник", "cut_sandstone"), ("Пион", "peony"),
+        ("Пиротехническая звезда", "firework_star"), ("Плавильная печь", "blast_furnace"),
+        ("Плакучая лоза", "weeping_vines"), ("Плачущий обсидиан", "crying_obsidian"),
+        ("Плита из бамбуковой мозаики", "bamboo_mosaic_slab"),
+        ("Плита из бледного дуба", "pale_oak_slab"), ("Плита из гладкого камня", "smooth_stone_slab"),
+        ("Плита из гладкого кварца", "smooth_quartz_slab"),
+        ("Плита из гладкого красного песчаника", "smooth_red_sandstone_slab"),
+        ("Плита из гладкого песчаника", "smooth_sandstone_slab"),
+        ("Плита из глубинносланцевого кирпича", "deepslate_brick_slab"),
+        ("Плита из глубинносланцевого плитняка", "deepslate_tile_slab"),
+        ("Плита из замшелого каменного кирпича", "mossy_stone_brick_slab"),
+        ("Плита из каменного кирпича", "stone_brick_slab"),
+        ("Плита из колотого глубинного сланца", "cobbled_deepslate_slab"),
+        ("Плита из красного незерского кирпича", "red_nether_brick_slab"),
+        ("Плита из красного песчаника", "red_sandstone_slab"),
+        ("Плита из незерского кирпича", "nether_brick_slab"),
+        ("Плита из пиленого красного песчаника", "cut_red_sandstone_slab"),
+        ("Плита из пиленого песчаника", "cut_sandstone_slab"),
+        ("Плита из полированно-чернитного кирпича", "polished_blackstone_brick_slab"),
+        ("Плита из полированного андезита", "polished_andesite_slab"),
+        ("Плита из полированного глубинного сланца", "polished_deepslate_slab"),
+        ("Плита из полированного гранита", "polished_granite_slab"),
+        ("Плита из полированного диорита", "polished_diorite_slab"),
+        ("Плита из полированного туфа", "polished_tuff_slab"),
+        ("Плита из полированного чернита", "polished_blackstone_slab"),
+        ("Плита из призмаринового кирпича", "prismarine_brick_slab"),
+        ("Плита из смоляного кирпича", "resin_brick_slab"),
+        ("Плита из тропического дерева", "jungle_slab"),
+        ("Плита из туфового кирпича", "tuff_brick_slab"), ("Плита из тёмного дуба", "dark_oak_slab"),
+        ("Плита из тёмного призмарина", "dark_prismarine_slab"),
+        ("Плита из эндернякового кирпича", "end_stone_brick_slab"), ("Плод хоруса", "chorus_fruit"),
+        ("Плотная грязь", "packed_mud"), ("Плотный лёд", "packed_ice"), ("Поводок", "lead"),
+        ("Повреждённая наковальня", "chipped_anvil"),
+        ("Повторяющий командный блок", "repeating_command_block"),
+        ("Подвесная табличка из бледного дуба", "pale_oak_hanging_sign"),
+        ("Подвесная табличка из тропического дерева", "jungle_hanging_sign"),
+        ("Подвесная табличка из тёмного дуба", "dark_oak_hanging_sign"), ("Подзол", "podzol"),
+        ("Подзорная труба", "spyglass"), ("Подмостки", "scaffolding"),
+        ("Подозрительный гравий", "suspicious_gravel"), ("Подозрительный песок", "suspicious_sand"),
+        ("Подсолнух", "sunflower"), ("Полированно-чернитные кирпичи", "polished_blackstone_bricks"),
+        ("Полированный андезит", "polished_andesite"), ("Полированный базальт", "polished_basalt"),
+        ("Полированный глубинный сланец", "polished_deepslate"),
+        ("Полированный гранит", "polished_granite"), ("Полированный диорит", "polished_diorite"),
+        ("Полированный туф", "polished_tuff"), ("Полированный чернит", "polished_blackstone"),
+        ("Порох", "gunpowder"), ("Поршень", "piston"),
+        ("Последовательный командный блок", "chain_command_block"),
+        ("Потемневшая медная дверь", "exposed_copper_door"),
+        ("Потемневшая медная лампа", "exposed_copper_bulb"),
+        ("Потемневшая медная решётка", "exposed_copper_grate"),
+        ("Потемневшая резная медная плита", "exposed_cut_copper_slab"),
+        ("Потемневшие резные медные ступеньки", "exposed_cut_copper_stairs"),
+        ("Потемневший медный блок", "exposed_copper"),
+        ("Потемневший медный люк", "exposed_copper_trapdoor"),
+        ("Потемневший резной медный блок", "exposed_cut_copper"),
+        ("Потемневший точёный медный блок", "exposed_chiseled_copper"),
+        ("Потрескавшиеся глубинносланцевые кирпичи", "cracked_deepslate_bricks"),
+        ("Потрескавшиеся каменные кирпичи", "cracked_stone_bricks"),
+        ("Потрескавшиеся незерские кирпичи", "cracked_nether_bricks"),
+        ("Потрескавшиеся полированно-чернитные кирпичи", "cracked_polished_blackstone_bricks"),
+        ("Потрескавшийся глубинносланцевый плитняк", "cracked_deepslate_tiles"),
+        ("Почва душ", "soul_soil"), ("Призмарин", "prismarine"),
+        ("Призмариновая ограда", "prismarine_wall"), ("Призмариновая плита", "prismarine_slab"),
+        ("Призмариновые кирпичи", "prismarine_bricks"),
+        ("Призмариновые ступеньки", "prismarine_stairs"),
+        ("Прожаренный плод хоруса", "popped_chorus_fruit"), ("Проигрыватель", "jukebox"),
+        ("Пузырчатый коралл", "bubble_coral"), ("Пузырёк опыта", "experience_bottle"),
+        ("Пурпур", "purpur_block"), ("Пурпурная глазурованная керамика", "magenta_glazed_terracotta"),
+        ("Пурпурная керамика", "magenta_terracotta"), ("Пурпурная кровать", "magenta_bed"),
+        ("Пурпурная свеча", "magenta_candle"),
+        ("Пурпурная стеклянная панель", "magenta_stained_glass_pane"),
+        ("Пурпурная шерсть", "magenta_wool"), ("Пурпурное стекло", "magenta_stained_glass"),
+        ("Пурпурный бетон", "magenta_concrete"), ("Пурпурный ковёр", "magenta_carpet"),
+        ("Пурпурный краситель", "magenta_dye"), ("Пурпурный мешок", "magenta_bundle"),
+        ("Пурпурный сухой бетон", "magenta_concrete_powder"), ("Пурпурный флаг", "magenta_banner"),
+        ("Пурпурный шалкеровый ящик", "magenta_shulker_box"), ("Пурпуровая плита", "purpur_slab"),
+        ("Пурпуровые ступеньки", "purpur_stairs"), ("Пурпуровый пилон", "purpur_pillar"),
+        ("Пустой блок", "structure_void"), ("Пчелиное гнездо", "bee_nest"),
+        ("Пчелиные соты", "honeycomb"), ("Пшеница", "wheat"), ("Разбитая наковальня", "damaged_anvil"),
+        ("Раздатчик", "dispenser"), ("Раковина наутилуса", "nautilus_shell"), ("Рамка", "item_frame"),
+        ("Рамка портала в Энд", "end_portal_frame"), ("Раскидистый папоротник", "large_fern"),
+        ("Раскрытая глазалия", "open_eyeblossom"), ("Рассадник испытаний", "trial_spawner"),
+        ("Рассадник монстров", "spawner"), ("Редстоуновая пыль", "redstone"),
+        ("Редстоуновая руда", "redstone_ore"), ("Редстоуновый блок", "redstone_block"),
+        ("Редстоуновый компаратор", "comparator"), ("Редстоуновый повторитель", "repeater"),
+        ("Редстоуновый факел", "redstone_torch"), ("Редстоуновый фонарь", "redstone_lamp"),
+        ("Редстоуноносный глубинный сланец", "deepslate_redstone_ore"),
+        ("Резная книжная полка", "chiseled_bookshelf"), ("Резная медная плита", "cut_copper_slab"),
+        ("Резной глубинный сланец", "chiseled_deepslate"),
+        ("Резной кварцевый блок", "chiseled_quartz_block"),
+        ("Резной красный песчаник", "chiseled_red_sandstone"), ("Резной медный блок", "cut_copper"),
+        ("Резной песчаник", "chiseled_sandstone"),
+        ("Резной полированный чернит", "chiseled_polished_blackstone"),
+        ("Резной туф", "chiseled_tuff"), ("Резные каменные кирпичи", "chiseled_stone_bricks"),
+        ("Резные медные ступеньки", "cut_copper_stairs"),
+        ("Резные незерские кирпичи", "chiseled_nether_bricks"),
+        ("Резные смоляные кирпичи", "chiseled_resin_bricks"),
+        ("Резные туфовые кирпичи", "chiseled_tuff_bricks"), ("Рельсы", "rail"),
+        ("Рельсы с датчиком", "detector_rail"), ("Роговой коралл", "horn_coral"),
+        ("Роза визера", "wither_rose"), ("Розовая глазурованная керамика", "pink_glazed_terracotta"),
+        ("Розовая керамика", "pink_terracotta"), ("Розовая кровать", "pink_bed"),
+        ("Розовая свеча", "pink_candle"), ("Розовая стеклянная панель", "pink_stained_glass_pane"),
+        ("Розовая шерсть", "pink_wool"), ("Розовое стекло", "pink_stained_glass"),
+        ("Розовые лепестки", "pink_petals"), ("Розовый бетон", "pink_concrete"),
+        ("Розовый ковёр", "pink_carpet"), ("Розовый краситель", "pink_dye"),
+        ("Розовый куст", "rose_bush"), ("Розовый мешок", "pink_bundle"),
+        ("Розовый сухой бетон", "pink_concrete_powder"), ("Розовый тюльпан", "pink_tulip"),
+        ("Розовый флаг", "pink_banner"), ("Розовый шалкеровый ящик", "pink_shulker_box"),
+        ("Ромашка", "oxeye_daisy"), ("Рудная медь", "raw_copper"), ("Рудное железо", "raw_iron"),
+        ("Рудное золото", "raw_gold"), ("Рычаг", "lever"), ("Саженец акации", "acacia_sapling"),
+        ("Саженец берёзы", "birch_sapling"), ("Саженец бледного дуба", "pale_oak_sapling"),
+        ("Саженец вишни", "cherry_sapling"), ("Саженец дуба", "oak_sapling"),
+        ("Саженец ели", "spruce_sapling"), ("Саженец тропического дерева", "jungle_sapling"),
+        ("Саженец тёмного дуба", "dark_oak_sapling"), ("Саманная ограда", "mud_brick_wall"),
+        ("Саманная плита", "mud_brick_slab"), ("Саманные кирпичи", "mud_bricks"),
+        ("Саманные ступеньки", "mud_brick_stairs"), ("Самоходная вагонетка", "furnace_minecart"),
+        ("Сахар", "sugar"), ("Сахарный тростник", "sugar_cane"), ("Сборщик", "crafter"),
+        ("Свекольный суп", "beetroot_soup"), ("Сверкающий ломтик арбуза", "glistering_melon_slice"),
+        ("Свет", "light"), ("Светильник Джека", "jack_o_lantern"),
+        ("Светло-серая глазурованная керамика", "light_gray_glazed_terracotta"),
+        ("Светло-серая керамика", "light_gray_terracotta"), ("Светло-серая кровать", "light_gray_bed"),
+        ("Светло-серая свеча", "light_gray_candle"),
+        ("Светло-серая стеклянная панель", "light_gray_stained_glass_pane"),
+        ("Светло-серая шерсть", "light_gray_wool"),
+        ("Светло-серое стекло", "light_gray_stained_glass"),
+        ("Светло-серый бетон", "light_gray_concrete"), ("Светло-серый ковёр", "light_gray_carpet"),
+        ("Светло-серый краситель", "light_gray_dye"), ("Светло-серый мешок", "light_gray_bundle"),
+        ("Светло-серый сухой бетон", "light_gray_concrete_powder"),
+        ("Светло-серый флаг", "light_gray_banner"),
+        ("Светло-серый шалкеровый ящик", "light_gray_shulker_box"),
+        ("Светокаменная пыль", "glowstone_dust"), ("Светокамень", "glowstone"),
+        ("Светящаяся рамка", "glow_item_frame"), ("Светящиеся ягоды", "glow_berries"),
+        ("Светящийся лишайник", "glow_lichen"), ("Светящийся чернильный мешок", "glow_ink_sac"),
+        ("Свеча", "candle"), ("Свисающие корни", "hanging_roots"),
+        ("Свисающий бледный мох", "pale_hanging_moss"), ("Свёкла", "beetroot"),
+        ("Сгусток магмы", "magma_cream"), ("Сгусток слизи", "slime_ball"),
+        ("Сгусток смолы", "resin_clump"), ("Седло", "saddle"), ("Семена арбуза", "melon_seeds"),
+        ("Семена пшеницы", "wheat_seeds"), ("Семена свёклы", "beetroot_seeds"),
+        ("Семена тыквы", "pumpkin_seeds"), ("Семена факельника", "torchflower_seeds"),
+        ("Серая глазурованная керамика", "gray_glazed_terracotta"),
+        ("Серая керамика", "gray_terracotta"), ("Серая кровать", "gray_bed"),
+        ("Серая свеча", "gray_candle"), ("Серая стеклянная панель", "gray_stained_glass_pane"),
+        ("Серая шерсть", "gray_wool"), ("Сердце моря", "heart_of_the_sea"),
+        ("Серое стекло", "gray_stained_glass"), ("Серый бетон", "gray_concrete"),
+        ("Серый ковёр", "gray_carpet"), ("Серый краситель", "gray_dye"),
+        ("Серый мешок", "gray_bundle"), ("Серый сухой бетон", "gray_concrete_powder"),
+        ("Серый флаг", "gray_banner"), ("Серый шалкеровый ящик", "gray_shulker_box"),
+        ("Синее стекло", "blue_stained_glass"), ("Синий бетон", "blue_concrete"),
+        ("Синий василёк", "cornflower"), ("Синий ковёр", "blue_carpet"),
+        ("Синий краситель", "blue_dye"), ("Синий лёд", "blue_ice"), ("Синий мешок", "blue_bundle"),
+        ("Синий сухой бетон", "blue_concrete_powder"), ("Синий флаг", "blue_banner"),
+        ("Синий шалкеровый ящик", "blue_shulker_box"),
+        ("Синяя глазурованная керамика", "blue_glazed_terracotta"),
+        ("Синяя керамика", "blue_terracotta"), ("Синяя кровать", "blue_bed"),
+        ("Синяя орхидея", "blue_orchid"), ("Синяя свеча", "blue_candle"),
+        ("Синяя стеклянная панель", "blue_stained_glass_pane"), ("Синяя шерсть", "blue_wool"),
+        ("Сирень", "lilac"), ("Скалк", "sculk"), ("Скалк-сенсор", "sculk_sensor"),
+        ("Скалковая жила", "sculk_vein"), ("Скалковый катализатор", "sculk_catalyst"),
+        ("Скалковый крикун", "sculk_shrieker"), ("Скрипцевина", "creaking_heart"),
+        ("Сладкие ягоды", "sweet_berries"), ("Слеза гаста", "ghast_tear"),
+        ("Смоляной блок", "resin_block"), ("Смоляной кирпич", "resin_brick"),
+        ("Смоляные кирпичи", "resin_bricks"), ("Снег", "snow"), ("Снежок", "snowball"),
+        ("Сноп сена", "hay_block"), ("Состаренная медная дверь", "weathered_copper_door"),
+        ("Состаренная медная лампа", "weathered_copper_bulb"),
+        ("Состаренная медная решётка", "weathered_copper_grate"),
+        ("Состаренная резная медная плита", "weathered_cut_copper_slab"),
+        ("Состаренные резные медные ступеньки", "weathered_cut_copper_stairs"),
+        ("Состаренный медный блок", "weathered_copper"),
+        ("Состаренный медный люк", "weathered_copper_trapdoor"),
+        ("Состаренный резной медный блок", "weathered_cut_copper"),
+        ("Состаренный точёный медный блок", "weathered_chiseled_copper"),
+        ("Спектральная стрела", "spectral_arrow"), ("Спороцвет", "spore_blossom"),
+        ("Средний аметистовый бутон", "medium_amethyst_bud"), ("Стейк", "cooked_beef"),
+        ("Стекло", "glass"), ("Стеклянная панель", "glass_pane"), ("Стержень Энда", "end_rod"),
+        ("Стойка для брони", "armor_stand"), ("Стол картографа", "cartography_table"),
+        ("Стол кузнеца", "smithing_table"), ("Стол лучника", "fletching_table"), ("Стрела", "arrow"),
+        ("Стручок кувшинницы", "pitcher_pod"),
+        ("Ступеньки из бамбуковой мозаики", "bamboo_mosaic_stairs"),
+        ("Ступеньки из бледного дуба", "pale_oak_stairs"),
+        ("Ступеньки из гладкого кварца", "smooth_quartz_stairs"),
+        ("Ступеньки из гладкого красного песчаника", "smooth_red_sandstone_stairs"),
+        ("Ступеньки из гладкого песчаника", "smooth_sandstone_stairs"),
+        ("Ступеньки из глубинносланцевого кирпича", "deepslate_brick_stairs"),
+        ("Ступеньки из глубинносланцевого плитняка", "deepslate_tile_stairs"),
+        ("Ступеньки из замшелого каменного кирпича", "mossy_stone_brick_stairs"),
+        ("Ступеньки из каменного кирпича", "stone_brick_stairs"),
+        ("Ступеньки из колотого глубинного сланца", "cobbled_deepslate_stairs"),
+        ("Ступеньки из красного незерского кирпича", "red_nether_brick_stairs"),
+        ("Ступеньки из красного песчаника", "red_sandstone_stairs"),
+        ("Ступеньки из незерского кирпича", "nether_brick_stairs"),
+        ("Ступеньки из полированно-чернитного кирпича", "polished_blackstone_brick_stairs"),
+        ("Ступеньки из полированного андезита", "polished_andesite_stairs"),
+        ("Ступеньки из полированного глубинного сланца", "polished_deepslate_stairs"),
+        ("Ступеньки из полированного гранита", "polished_granite_stairs"),
+        ("Ступеньки из полированного диорита", "polished_diorite_stairs"),
+        ("Ступеньки из полированного туфа", "polished_tuff_stairs"),
+        ("Ступеньки из полированного чернита", "polished_blackstone_stairs"),
+        ("Ступеньки из призмаринового кирпича", "prismarine_brick_stairs"),
+        ("Ступеньки из смоляного кирпича", "resin_brick_stairs"),
+        ("Ступеньки из тропического дерева", "jungle_stairs"),
+        ("Ступеньки из туфового кирпича", "tuff_brick_stairs"),
+        ("Ступеньки из тёмного дуба", "dark_oak_stairs"),
+        ("Ступеньки из тёмного призмарина", "dark_prismarine_stairs"),
+        ("Ступеньки из эндернякового кирпича", "end_stone_brick_stairs"), ("Сундук", "chest"),
+        ("Сундук-ловушка", "trapped_chest"), ("Сушёная ламинария", "dried_kelp"),
+        ("Сырая баранина", "mutton"), ("Сырая говядина", "beef"), ("Сырая крольчатина", "rabbit"),
+        ("Сырая свинина", "porkchop"), ("Сырая треска", "cod"), ("Сырой лосось", "salmon"),
+        ("Табличка из бледного дуба", "pale_oak_sign"),
+        ("Табличка из тропического дерева", "jungle_sign"),
+        ("Табличка из тёмного дуба", "dark_oak_sign"), ("Терракота", "terracotta"),
+        ("Ткацкий станок", "loom"), ("Тонированное стекло", "tinted_glass"), ("Торт", "cake"),
+        ("Тотем бессмертия", "totem_of_undying"), ("Точило", "grindstone"),
+        ("Точёный медный блок", "chiseled_copper"), ("Трезубец", "trident"),
+        ("Треска в ведре", "cod_bucket"), ("Тропинка", "dirt_path"),
+        ("Тропическая рыба", "tropical_fish"), ("Тропическая рыба в ведре", "tropical_fish_bucket"),
+        ("Тропическое дерево", "jungle_wood"), ("Трубчатый коралл", "tube_coral"), ("Туф", "tuff"),
+        ("Туфовая ограда", "tuff_wall"), ("Туфовая плита", "tuff_slab"),
+        ("Туфовые кирпичи", "tuff_bricks"), ("Туфовые ступеньки", "tuff_stairs"),
+        ("Тушёные грибы", "mushroom_stew"), ("Тушёный кролик", "rabbit_stew"), ("Тыква", "pumpkin"),
+        ("Тыквенный пирог", "pumpkin_pie"), ("Тёмный дуб", "dark_oak_wood"),
+        ("Тёмный призмарин", "dark_prismarine"), ("Угленосный глубинный сланец", "deepslate_coal_ore"),
+        ("Уголь", "coal"), ("Угольная руда", "coal_ore"), ("Угольный блок", "coal_block"),
+        ("Удочка", "fishing_rod"), ("Удочка с искажённым грибом", "warped_fungus_on_a_stick"),
+        ("Удочка с морковкой", "carrot_on_a_stick"), ("Узорчатая ваза", "decorated_pot"),
+        ("Укреплённый глубинный сланец", "reinforced_deepslate"), ("Улей", "beehive"),
+        ("Факел", "torch"), ("Факел душ", "soul_torch"), ("Факельник", "torchflower"),
+        ("Фейерверк", "firework_rocket"),
+        ("Фиолетовая глазурованная керамика", "purple_glazed_terracotta"),
+        ("Фиолетовая керамика", "purple_terracotta"), ("Фиолетовая кровать", "purple_bed"),
+        ("Фиолетовая свеча", "purple_candle"),
+        ("Фиолетовая стеклянная панель", "purple_stained_glass_pane"),
+        ("Фиолетовая шерсть", "purple_wool"), ("Фиолетовое стекло", "purple_stained_glass"),
+        ("Фиолетовый бетон", "purple_concrete"), ("Фиолетовый ковёр", "purple_carpet"),
+        ("Фиолетовый краситель", "purple_dye"), ("Фиолетовый мешок", "purple_bundle"),
+        ("Фиолетовый сухой бетон", "purple_concrete_powder"), ("Фиолетовый флаг", "purple_banner"),
+        ("Фиолетовый шалкеровый ящик", "purple_shulker_box"), ("Фонарь", "lantern"),
+        ("Фонарь душ", "soul_lantern"), ("Хаустония серая", "azure_bluet"), ("Хвоя", "spruce_leaves"),
+        ("Хлеб", "bread"), ("Хорус", "chorus_plant"), ("Хранилище", "vault"),
+        ("Цветок хоруса", "chorus_flower"), ("Цветочный горшок", "flower_pot"),
+        ("Цветущая азалия", "flowering_azalea"), ("Цветущий аметист", "budding_amethyst"),
+        ("Цепь", "chain"), ("Чародейская книга", "enchanted_book"),
+        ("Чародейский стол", "enchanting_table"), ("Часы", "clock"), ("Череп", "skeleton_skull"),
+        ("Череп визер-скелета", "wither_skeleton_skull"), ("Черепаший панцирь", "turtle_helmet"),
+        ("Черепаший щиток", "turtle_scute"), ("Черепашье яйцо", "turtle_egg"),
+        ("Чернильный мешок", "ink_sac"), ("Чернит", "blackstone"),
+        ("Чернитная ограда", "blackstone_wall"), ("Чернитная плита", "blackstone_slab"),
+        ("Чернитные ступеньки", "blackstone_stairs"), ("Чистая карта", "map"),
+        ("Чёрная глазурованная керамика", "black_glazed_terracotta"),
+        ("Чёрная керамика", "black_terracotta"), ("Чёрная кровать", "black_bed"),
+        ("Чёрная свеча", "black_candle"), ("Чёрная стеклянная панель", "black_stained_glass_pane"),
+        ("Чёрная шерсть", "black_wool"), ("Чёрное стекло", "black_stained_glass"),
+        ("Чёрный бетон", "black_concrete"), ("Чёрный ковёр", "black_carpet"),
+        ("Чёрный краситель", "black_dye"), ("Чёрный мешок", "black_bundle"),
+        ("Чёрный сухой бетон", "black_concrete_powder"), ("Чёрный флаг", "black_banner"),
+        ("Чёрный шалкеровый ящик", "black_shulker_box"), ("Шалкеровый ящик", "shulker_box"),
+        ("Щит", "shield"), ("Щиток броненосца", "armadillo_scute"), ("Элитры", "elytra"),
+        ("Эндер-жемчуг", "ender_pearl"), ("Эндер-сундук", "ender_chest"), ("Эндерняк", "end_stone"),
+        ("Эндерняковые кирпичи", "end_stone_bricks"), ("Энергорельсы", "powered_rail"),
+        ("Яблоко", "apple"), ("Ядовитый картофель", "poisonous_potato"), ("Яйцо", "egg"),
+        ("Яйцо дракона", "dragon_egg"), ("Яйцо нюхача", "sniffer_egg"),
+        ("Якорь возрождения", "respawn_anchor")
+    };
+
+    private readonly System.Collections.ObjectModel.ObservableCollection<AdItem> _ads = new();
+    private string _adSide = "sell";
+
+    private static string AdIconUrl(string itemId) =>
+        $"https://mcasset.cloud/26.2/assets/minecraft/textures/item/{itemId}.png";
+
+    private static (string Name, string Id)? FindAdItem(string text)
+    {
+        var probe = (text ?? "").Trim().ToLowerInvariant();
+        if (probe.Length == 0) return null;
+        foreach (var entry in AdItems)
+        {
+            if (entry.Name.ToLowerInvariant() == probe || entry.Id == probe) return entry;
+        }
+        foreach (var entry in AdItems)
+        {
+            if (entry.Name.ToLowerInvariant().Contains(probe) || entry.Id.Contains(probe)) return entry;
+        }
+        return null;
+    }
+
+    private void ShowAdSuggest(ItemsControl target, TextBox source)
+    {
+        target.Items.Clear();
+        var probe = source.Text.Trim().ToLowerInvariant();
+        var matches = probe.Length == 0
+            ? AdItems.Take(0)
+            : AdItems.Where(e => e.Name.ToLowerInvariant().Contains(probe) || e.Id.Contains(probe)).Take(24);
+        foreach (var entry in matches)
+        {
+            var button = new Button
+            {
+                Content = entry.Name,
+                Tag = (target, source, entry.Name),
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(8, 4, 8, 4),
+                FontSize = 11,
+            };
+            button.Click += OnAdSuggestPick;
+            target.Items.Add(button);
+        }
+    }
+
+    private void OnAdSuggestPick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: var tag } button) return;
+        var tuple = (ValueTuple<ItemsControl, TextBox, string>)tag;
+        tuple.Item2.Text = tuple.Item3;
+        tuple.Item1.Items.Clear();
+        UpdateAdIconSoon();
+    }
+
+    private void OnAdItemSearch(object sender, TextChangedEventArgs e)
+    {
+        ShowAdSuggest(AdItemSuggest, AdItemBox);
+        UpdateAdIconSoon();
+    }
+
+    private void OnAdPriceSearch(object sender, TextChangedEventArgs e)
+    {
+        ShowAdSuggest(AdPriceSuggest, AdPriceBox);
+        UpdateAdIconSoon();
+    }
+
+    private void UpdateAdIcons()
+    {
+        var item = FindAdItem(AdItemBox.Text);
+        if (item is not null)
+        {
+            AdItemIcon.Source = LoadCachedImage(AdIconUrl(item.Value.Id));
+        }
+        var price = FindAdItem(AdPriceBox.Text);
+        if (price is not null)
+        {
+            AdPriceIcon.Source = LoadCachedImage(AdIconUrl(price.Value.Id));
+        }
+    }
+
+    private CancellationTokenSource? _adIconCts;
+
+    /// <summary>Иконки предметов подтягиваются фоном: сеть в UI-потоке вешает окно.</summary>
+    private void UpdateAdIconSoon()
+    {
+        _adIconCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _adIconCts = cts;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(250, cts.Token).ConfigureAwait(false);
+            var item = FindAdItem(AdItemBox.Text);
+            var price = FindAdItem(AdPriceBox.Text);
+            var itemImage = item is null ? null : await LoadImageAsync(AdIconUrl(item.Value.Id)).ConfigureAwait(false);
+            var priceImage = price is null ? null : await LoadImageAsync(AdIconUrl(price.Value.Id)).ConfigureAwait(false);
+            if (cts.IsCancellationRequested) return;
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (cts.IsCancellationRequested) return;
+                if (item is not null) AdItemIcon.Source = itemImage;
+                if (price is not null) AdPriceIcon.Source = priceImage;
+            });
+        }, cts.Token).ContinueWith(_ => { }, TaskScheduler.Default);
+    }
+
+    private void OnAdSideClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string side }) return;
+        _adSide = side == "buy" ? "buy" : "sell";
+        Toast(_adSide == "buy" ? "Объявление: куплю" : "Объявление: продаю");
+    }
+
+    private void OnAdComposeClick(object sender, RoutedEventArgs e)
+    {
+        AdComposerCard.Visibility = AdComposerCard.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (AdComposerCard.Visibility == Visibility.Visible)
+        {
+            AdItemBox.Clear();
+            AdPriceBox.Clear();
+            AdItemCountBox.Text = "1";
+            AdPriceCountBox.Text = "1";
+            AdItemSuggest.Items.Clear();
+            AdPriceSuggest.Items.Clear();
+            AdItemIcon.Source = null;
+            AdPriceIcon.Source = null;
+            AdItemBox.Focus();
+        }
+    }
+
+    private void OnAdCancelClick(object sender, RoutedEventArgs e)
+    {
+        AdComposerCard.Visibility = Visibility.Collapsed;
+    }
+
+    private async void OnAdsRefreshClick(object sender, RoutedEventArgs e) => await LoadAdsAsync();
+
+    /// <summary>Загружает объявления с сервера и раскладывает: открытые сверху, закрытые внизу.</summary>
+    private async Task LoadAdsAsync()
+    {
+        AdsState.Text = "Загрузка объявлений…";
         try
         {
-            var folder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Craftunity", "webview");
-            Directory.CreateDirectory(folder);
-            if (!await MapReachableAsync())
+            using var response = await ChatHttp.GetAsync(ChatBaseUrl + "/ads");
+            if (!response.IsSuccessStatusCode)
             {
-                MapView.Visibility = Visibility.Collapsed;
-                MapFallback.Visibility = Visibility.Visible;
-                MapFallback.Text = "Сервер сейчас выключен — карта недоступна.\n\n" +
-                                   "Включите сервер и нажмите «Обновить».";
-                MapHint.Text = "Карта живёт на самом сервере: " + MapUrl;
+                AdsState.Text = "Сервер объявлений недоступен: " + (int)response.StatusCode;
                 return;
             }
-
-            var environment = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(null, folder);
-            await MapView.EnsureCoreWebView2Async(environment);
-            MapView.CoreWebView2.Navigate(MapUrl);
-            MapView.Visibility = Visibility.Visible;
-            MapFallback.Visibility = Visibility.Collapsed;
-            MapHint.Text = "Карта открывается прямо в лаунчере.";
-            _mapReady = true;
-        }
-        catch (Exception exc)
-        {
-            MapView.Visibility = Visibility.Collapsed;
-            MapFallback.Visibility = Visibility.Visible;
-            MapFallback.Text = "Не удалось открыть карту внутри лаунчера.\n" +
-                               "Причина: " + exc.Message + "\n\n" +
-                               "Нажмите «Открыть в браузере» — карта откроется в браузере.";
-            MapHint.Text = "Для встроенной карты нужен компонент WebView2 Runtime.";
-        }
-    }
-
-    /// <summary>Проверяет, отвечает ли веб-сервер BlueMap на сервере.</summary>
-    private static async Task<bool> MapReachableAsync()
-    {
-        try
-        {
-            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(6) };
-            using var response = await client.GetAsync(MapUrl);
-            return response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private void OnMapReloadClick(object sender, RoutedEventArgs e)
-    {
-        if (_mapReady && MapView.CoreWebView2 is not null)
-        {
-            MapView.CoreWebView2.Navigate(MapUrl);
-        }
-        else
-        {
-            _ = EnsureMapAsync();
-        }
-    }
-
-    private void OnMapOpenBrowserClick(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var mine = _overview?.InstanceId ?? "";
+            _ads.Clear();
+            foreach (var item in doc.RootElement.Arr("ads"))
             {
-                FileName = MapUrl,
-                UseShellExecute = true,
+                var ad = new AdItem
+                {
+                    Id = (long)item.Num("id"),
+                    InstanceId = item.Str("instance_id"),
+                    Username = item.Str("username"),
+                    Side = item.Str("side", "sell"),
+                    Item = item.Str("item"),
+                    ItemCount = (int)item.Num("item_count"),
+                    PriceItem = item.Str("price_item"),
+                    PriceCount = (int)item.Num("price_count"),
+                    Status = item.Str("status", "open"),
+                    ClosedWith = item.Str("closed_with"),
+                    IsMine = string.Equals(item.Str("instance_id"), mine, StringComparison.OrdinalIgnoreCase),
+                };
+                foreach (var offer in item.Arr("offers"))
+                {
+                    ad.Offers.Add(new AdOffer
+                    {
+                        Id = (long)offer.Num("id"),
+                        AdId = ad.Id,
+                        Username = offer.Str("username"),
+                        InstanceId = offer.Str("instance_id"),
+                        Count = (int)offer.Num("count"),
+                        Price = (int)offer.Num("price"),
+                        State = offer.Str("state", "pending"),
+                        IsAuthor = ad.IsMine,
+                    });
+                }
+                _ads.Add(ad);
+            }
+
+            var ordered = _ads
+                .OrderBy(a => a.Status == "closed" ? 1 : 0)
+                .ThenByDescending(a => a.Id)
+                .ToList();
+            _ads.Clear();
+            foreach (var ad in ordered) _ads.Add(ad);
+
+            AdsList.ItemsSource = _ads;
+            var openAds = _ads.Count(a => a.Status != "closed");
+            AdsState.Text = $"Открытых объявлений: {openAds} · закрытых: {_ads.Count - openAds}";
+
+            foreach (var ad in _ads)
+            {
+                var match = FindAdItem(ad.Item);
+                if (match is null) continue;
+                if (LoadCachedImage(AdIconUrl(match.Value.Id)) is { } cached) ad.ItemIcon = cached;
+            }
+            AdsList.Items.Refresh();
+            _ = Task.Run(async () =>
+            {
+                foreach (var ad in ordered)
+                {
+                    var match = FindAdItem(ad.Item);
+                    if (match is null) continue;
+                    var image = await LoadImageAsync(AdIconUrl(match.Value.Id)).ConfigureAwait(false);
+                    if (image is null) continue;
+                    await Dispatcher.InvokeAsync(() => ad.ItemIcon = image);
+                }
             });
         }
         catch (Exception exc)
         {
+            AdsState.Text = "Не удалось загрузить объявления: " + exc.Message;
+        }
+    }
+
+    private async void OnAdPublishClick(object sender, RoutedEventArgs e)
+    {
+        var item = FindAdItem(AdItemBox.Text);
+        var price = FindAdItem(AdPriceBox.Text);
+        if (item is null || price is null)
+        {
+            Toast("Выберите предмет и цену из списка", true);
+            return;
+        }
+        var itemCount = int.TryParse(AdItemCountBox.Text.Trim(), out var ic) ? Math.Clamp(ic, 1, 100000) : 1;
+        var priceCount = int.TryParse(AdPriceCountBox.Text.Trim(), out var pc) ? Math.Clamp(pc, 1, 100000) : 1;
+        var payload = new
+        {
+            instance_id = _overview?.InstanceId ?? "",
+            username = _overview?.Account?.Username ?? "",
+            side = _adSide,
+            item = item.Value.Name,
+            item_count = itemCount,
+            price_item = price.Value.Name,
+            price_count = priceCount,
+        };
+        var answer = await PostAdAsync("/ad/create", payload);
+        if (answer is null) return;
+        AdComposerCard.Visibility = Visibility.Collapsed;
+        Toast("Объявление опубликовано");
+        await LoadAdsAsync();
+    }
+
+    private async void OnAdOfferClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AdItem ad }) return;
+        var dialog = new AdOfferWindow(ad)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true) return;
+        var payload = new
+        {
+            instance_id = _overview?.InstanceId ?? "",
+            username = _overview?.Account?.Username ?? "",
+            ad_id = ad.Id,
+            count = dialog.OfferCount,
+            price = dialog.OfferPrice,
+        };
+        if (await PostAdAsync("/ad/offer", payload) is null) return;
+        Toast("Предложение отправлено");
+        await LoadAdsAsync();
+    }
+
+    private async void OnAdDeleteClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AdItem ad }) return;
+        var answer = MessageBox.Show(this, "Удалить объявление?", "Объявления",
+            MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes) return;
+        if (await PostAdAsync("/ad/delete", new { instance_id = _overview?.InstanceId ?? "", ad_id = ad.Id }) is null)
+        {
+            return;
+        }
+        Toast("Объявление удалено");
+        await LoadAdsAsync();
+    }
+
+    private async void OnOfferAccept(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AdOffer offer }) return;
+        if (await DecideOfferAsync(offer, true)) OpenAdOfferChat(offer);
+    }
+
+    private async void OnOfferDecline(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AdOffer offer }) return;
+        await DecideOfferAsync(offer, false);
+    }
+
+    private async Task<bool> DecideOfferAsync(AdOffer offer, bool accept)
+    {
+        var payload = new
+        {
+            instance_id = _overview?.InstanceId ?? "",
+            ad_id = offer.AdId,
+            offer_id = offer.Id,
+            accept,
+        };
+        if (await PostAdAsync("/ad/decide", payload) is null) return false;
+        Toast(accept ? "Предложение принято" : "Предложение отклонено");
+        await LoadAdsAsync();
+        return true;
+    }
+
+    private AdOffer? _notifyOffer;
+    private readonly HashSet<string> _adsSeen = new(StringComparer.OrdinalIgnoreCase);
+    private bool _adsSeeded;
+
+    /// <summary>Показывает окно по центру: автору — решение по предложению, остальным — приглашение.</summary>
+    /// <summary>Опрашивает объявления и показывает окно по центру при новых предложениях.</summary>
+    private async Task PollAdsAsync()
+    {
+        using var response = await ChatHttp.GetAsync(ChatBaseUrl + "/ads");
+        if (!response.IsSuccessStatusCode) return;
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var mine = _overview?.InstanceId ?? "";
+        var pending = new List<(AdOffer Offer, AdItem Ad)>();
+
+        foreach (var item in doc.RootElement.Arr("ads"))
+        {
+            var isMine = string.Equals(item.Str("instance_id"), mine, StringComparison.OrdinalIgnoreCase);
+            if (!isMine) continue;
+            var ad = new AdItem
+            {
+                Id = (long)item.Num("id"),
+                InstanceId = item.Str("instance_id"),
+                Username = item.Str("username"),
+                Side = item.Str("side", "sell"),
+                Item = item.Str("item"),
+                ItemCount = (int)item.Num("item_count"),
+                PriceItem = item.Str("price_item"),
+                PriceCount = (int)item.Num("price_count"),
+                Status = item.Str("status", "open"),
+                ClosedWith = item.Str("closed_with"),
+                IsMine = true,
+            };
+            if (ad.Status != "open") continue;
+            foreach (var offer in item.Arr("offers"))
+            {
+                if (offer.Str("state", "pending") != "pending") continue;
+                var parsed = new AdOffer
+                {
+                    Id = (long)offer.Num("id"),
+                    AdId = ad.Id,
+                    Username = offer.Str("username"),
+                    InstanceId = offer.Str("instance_id"),
+                    Count = (int)offer.Num("count"),
+                    Price = (int)offer.Num("price"),
+                    State = "pending",
+                    IsAuthor = true,
+                };
+                var key = ad.Id + ":" + parsed.Id;
+                if (!_adsSeen.Add(key)) continue;
+                pending.Add((parsed, ad));
+            }
+        }
+
+        // Первый проход только запоминает уже существующие предложения.
+        if (!_adsSeeded)
+        {
+            _adsSeeded = true;
+            return;
+        }
+
+        if (pending.Count == 0) return;
+        await Dispatcher.InvokeAsync(() =>
+        {
+            foreach (var (offer, ad) in pending)
+            {
+                PushBell(new BellNote
+                {
+                    Kind = "ad",
+                    Title = $"Предложение по «{ad.Item}»",
+                    Body = $"{offer.Username}: {offer.Count} шт. за {offer.Price}. Принять?",
+                    TimeLabel = DateTime.Now.ToString("HH:mm"),
+                });
+            }
+            if (AdNotification.Visibility == Visibility.Visible) return;
+            ShowAdNotification(pending[0].Offer, pending[0].Ad);
+        });
+    }
+
+    private void ShowAdNotification(AdOffer offer, AdItem ad)
+    {
+        _notifyOffer = offer;
+        var isAuthor = ad.IsMine;
+        AdNotificationTitle.Text = isAuthor
+            ? $"Предложение на «{ad.Title}»"
+            : $"Предложение по «{ad.Title}» принято";
+        AdNotificationText.Text = isAuthor
+            ? $"{offer.Username} предлагает {offer.Count} шт. за {offer.Price}. Принять?"
+            : $"{ad.Username} принял(а) ваше предложение: {offer.Count} шт. за {offer.Price}.";
+        var mark = isAuthor ? Visibility.Visible : Visibility.Collapsed;
+        AdNotificationYes.Visibility = mark;
+        AdNotificationNo.Visibility = mark;
+        AdNotification.Visibility = Visibility.Visible;
+    }
+
+    private void OnAdNotificationClose(object sender, RoutedEventArgs e)
+    {
+        // Уведомление прячется только решением «Да» или «Нет».
+        if (_notifyOffer is null)
+        {
+            AdNotification.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void OnAdNotificationYes(object sender, RoutedEventArgs e)
+    {
+        var offer = _notifyOffer;
+        AdNotification.Visibility = Visibility.Collapsed;
+        _notifyOffer = null;
+        if (offer is null) return;
+        if (await DecideOfferAsync(offer, true)) OpenAdOfferChat(offer);
+    }
+
+    private async void OnAdNotificationNo(object sender, RoutedEventArgs e)
+    {
+        var offer = _notifyOffer;
+        AdNotification.Visibility = Visibility.Collapsed;
+        _notifyOffer = null;
+        if (offer is null) return;
+        await DecideOfferAsync(offer, false);
+    }
+
+    /// <summary>После одобрения предложения открывает личные с тем, чьё предложение приняли.</summary>
+    private void OpenAdOfferChat(AdOffer offer)
+    {
+        try
+        {
+            if (Nav.SelectedIndex != 6) Nav.SelectedIndex = 6;
+            OpenDirectChat(offer.InstanceId, offer.Username, true);
+            if (_chatChannel != "dm") return;
+            Dispatcher.InvokeAsync(() =>
+            {
+                ChatInput.Focus();
+                Toast("Личные с " + (string.IsNullOrWhiteSpace(offer.Username) ? "автором предложения" : offer.Username));
+            }, System.Windows.Threading.DispatcherPriority.Background);
+        }
+        catch (Exception exc)
+        {
             Toast(exc.Message, true);
+        }
+    }
+
+    private async Task<JsonElement?> PostAdAsync(string path, object payload)
+    {
+        try
+        {
+            using var content = new StringContent(JsonSerializer.Serialize(payload),
+                System.Text.Encoding.UTF8, "application/json");
+            using var response = await ChatHttp.PostAsync(ChatBaseUrl + path, content);
+            var text = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                Toast("Объявления: " + text, true);
+                return null;
+            }
+            using var doc = JsonDocument.Parse(text);
+            return doc.RootElement.Clone();
+        }
+        catch (Exception exc)
+        {
+            Toast("Объявления: " + exc.Message, true);
+            return null;
         }
     }
 
@@ -796,6 +1959,157 @@ public partial class MainWindow : Window
             url += $"&self={Uri.EscapeDataString(self)}&peer={Uri.EscapeDataString(_chatPeerId)}";
         }
         return url;
+    }
+
+    // ------------------------------------------------------------------ новости
+
+    private readonly ObservableCollection<ChatMessage> _news = new();
+
+    /// <summary>Новости пишет только владелец сервера.</summary>
+    private bool CanPublishNews =>
+        string.Equals(_overview?.Account?.Username ?? "", "Danipro914", StringComparison.OrdinalIgnoreCase);
+
+    private void ApplyNewsRights()
+    {
+        var can = CanPublishNews;
+        NewsComposer.Visibility = can ? Visibility.Visible : Visibility.Collapsed;
+        NewsReadOnlyNote.Visibility = can ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private async Task LoadNewsAsync()
+    {
+        try
+        {
+            ApplyNewsRights();
+            using var response = await ChatHttp.GetAsync(ChatBaseUrl + "/messages?since=0&channel=news");
+            if (!response.IsSuccessStatusCode)
+            {
+                NewsState.Text = "Сервер недоступен: " + (int)response.StatusCode;
+                return;
+            }
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var rows = new List<ChatMessage>();
+            foreach (var item in doc.RootElement.Arr("messages"))
+            {
+                rows.Add(new ChatMessage
+                {
+                    Id = (long)item.Num("id"),
+                    InstanceId = item.Str("instance_id"),
+                    Author = item.Str("username", "Гость"),
+                    Text = item.Str("text"),
+                    TimeLabel = FormatChatTime(item.Num("at")),
+                });
+            }
+            rows.Sort((a, b) => b.Id.CompareTo(a.Id));
+            var mine = _overview?.InstanceId ?? "";
+            foreach (var row in rows)
+            {
+                row.NewsMine = !string.IsNullOrEmpty(mine)
+                               && string.Equals(row.InstanceId, mine, StringComparison.OrdinalIgnoreCase);
+            }
+            _news.Clear();
+            foreach (var row in rows) _news.Add(row);
+            NewsList.ItemsSource = _news;
+            HomeNewsList.ItemsSource = _news.Take(3).ToList();
+            NewsEmpty.Visibility = _news.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            HomeNewsEmpty.Visibility = _news.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            NewsState.Text = "";
+        }
+        catch (Exception exc)
+        {
+            NewsState.Text = "Новости недоступны: " + exc.Message;
+        }
+    }
+
+    private async void OnNewsPublishClick(object sender, RoutedEventArgs e)
+    {
+        if (!CanPublishNews)
+        {
+            NewsState.Text = "Новости публикует только Danipro914.";
+            return;
+        }
+        var text = NewsInput.Text.Trim();
+        if (text.Length == 0) return;
+        NewsState.Text = "Публикация:";
+        try
+        {
+            var payload = new
+            {
+                instance_id = _overview?.InstanceId ?? "",
+                username = _overview?.Account?.Username ?? "",
+                text,
+                channel = "news",
+            };
+            using var content = new StringContent(JsonSerializer.Serialize(payload),
+                System.Text.Encoding.UTF8, "application/json");
+            using var response = await ChatSendHttp.PostAsync(ChatBaseUrl + "/message", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                NewsState.Text = "Не удалось опубликовать: " + (int)response.StatusCode;
+                return;
+            }
+            NewsInput.Clear();
+            await LoadNewsAsync();
+            Toast("Новость опубликована");
+        }
+        catch (Exception exc)
+        {
+            NewsState.Text = "Не удалось опубликовать: " + exc.Message;
+        }
+    }
+
+    private async void OnNewsEditClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ChatMessage news }) return;
+        var dialog = new ChatEditWindow(news.Text) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        var body = dialog.MessageText.Trim();
+        if (string.IsNullOrWhiteSpace(body) || body == news.Text) return;
+        if (await PostNewsAsync("/message/edit", new { id = news.Id, text = body })) Toast("Новость изменена");
+    }
+
+    private async void OnNewsDeleteClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ChatMessage news }) return;
+        var answer = MessageBox.Show(this,
+            "Удалить эту новость? Она пропадёт у всех игроков.",
+            "Удалить новость", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes) return;
+        if (await PostNewsAsync("/message/delete", new { id = news.Id })) Toast("Новость удалена");
+    }
+
+    /// <summary>Правка и удаление новости: тот же приёмник, что у чата, но канал news.</summary>
+    private async Task<bool> PostNewsAsync(string path, object payload)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(new
+            {
+                instance_id = _overview?.InstanceId ?? "",
+                id = GetProp<long>(payload, "id"),
+                text = GetProp<string>(payload, "text"),
+                channel = "news",
+                peer = "",
+            });
+            using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var response = await ChatHttp.PostAsync(ChatBaseUrl + path, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var answer = await response.Content.ReadAsStringAsync();
+                NewsState.Text = response.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "Это не ваша новость"
+                    : "Ошибка: " + (string.IsNullOrWhiteSpace(answer) ? ((int)response.StatusCode).ToString() : answer);
+                return false;
+            }
+            await LoadNewsAsync();
+            NewsState.Text = "";
+            return true;
+        }
+        catch (Exception exc)
+        {
+            NewsState.Text = "Ошибка: " + exc.Message;
+            return false;
+        }
     }
 
     private void OnChatRoomChanged(object sender, SelectionChangedEventArgs e)
@@ -823,7 +2137,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Переключает чат на личные сообщения с выбранным игроком.</summary>
-    private void OpenDirectChat(string? instanceId, string name)
+    private void OpenDirectChat(string? instanceId, string name, bool openOffline = false)
     {
         var id = (instanceId ?? "").Trim();
         var mine = _overview?.InstanceId ?? "";
@@ -832,16 +2146,21 @@ public partial class MainWindow : Window
             // Локальной записи нет — ищем по нику в реестре клиентов.
             var hit = _clientPeers.FirstOrDefault(p =>
                 string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (hit is null)
+            if (hit is null && !openOffline)
             {
                 ChatState.Text = "Не удалось открыть личные: игрок не в сети";
                 return;
             }
-            id = hit.Id;
+            if (hit is not null) id = hit.Id;
+        }
+        if (string.IsNullOrEmpty(id))
+        {
+            // Собеседник офлайн и его id неизвестен — открываем по нику.
+            id = "name:" + (name ?? "").Trim().ToLowerInvariant();
         }
         _chatChannel = "dm";
         _chatPeerId = id;
-        _chatPeerName = name;
+        _chatPeerName = name ?? "";
         ChatRooms.SelectedItem = null;
         // Открыли чат вручную — значит, он снова нужен в списке.
         if (_hiddenPeers.Remove(id))
@@ -943,6 +2262,35 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Удаляет личный чат из лаунчера; история переписки на сервере остаётся.</summary>
+    private void OnPeerRemoveClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ClientEntry entry }) return;
+        e.Handled = true;
+        var answer = MessageBox.Show(
+            this,
+            $"Удалить чат с «{entry.Name}» из лаунчера?\n\n" +
+            "Чат пропадёт из списка личных. История переписки сохранится и вернётся, " +
+            "если снова открыть чат с этим игроком.",
+            "Удалить личный чат",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes) return;
+        _hiddenPeers.Add(entry.Id);
+        SaveHiddenPeers();
+        if (string.Equals(_chatPeerId, entry.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            _chatChannel = "general";
+            _chatPeerId = "";
+            _chatPeerName = "";
+            ChatRooms.SelectedIndex = 0;
+            ApplyChatChannel();
+            _ = LoadChatAsync(true);
+        }
+        FillChatPeers();
+        ChatState.Text = "Чат с " + entry.Name + " удалён из лаунчера";
+    }
+
     /// <summary>Файл со списком удалённых личных чатов: скрытие переживает перезапуск.</summary>
     private static string HiddenPeersPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -981,35 +2329,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnPeerRemoveClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: ClientEntry entry }) return;
-        e.Handled = true;
-        var answer = MessageBox.Show(
-            this,
-            $"Удалить чат с «{entry.Name}» из лаунчера?\n\n" +
-            "Чат пропадёт из списка личных. История переписки сохранится и вернётся, " +
-            "если снова открыть чат с этим игроком.",
-            "Удалить личный чат",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question,
-            MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes) return;
-        _hiddenPeers.Add(entry.Id);
-        SaveHiddenPeers();
-        if (string.Equals(_chatPeerId, entry.Id, StringComparison.OrdinalIgnoreCase))
-        {
-            _chatChannel = "general";
-            _chatPeerId = "";
-            _chatPeerName = "";
-            ChatRooms.SelectedIndex = 0;
-            ApplyChatChannel();
-            _ = LoadChatAsync(true);
-        }
-        FillChatPeers();
-        ChatState.Text = "Чат с " + entry.Name + " удалён из лаунчера";
-    }
-
     /// <summary>В чате боковое меню схлопывается до иконок, чтобы освободить экран.</summary>
     private void SetCompactNav(bool compact)
     {
@@ -1030,7 +2349,7 @@ public partial class MainWindow : Window
         NavSkin.Content = compact ? "☻" : "☻  Скин";
         NavAccount.Content = compact ? "◉" : "◉  Аккаунт";
         NavSettings.Content = compact ? "⚙" : "⚙  Настройки";
-        NavMap.Content = compact ? "🗺" : "🗺  Карта";
+        NavAds.Content = compact ? "📢" : "📢  Объявления";
         NavChatText.Text = compact ? "✉" : "✉  Чат";
         PageScroll.Padding = compact ? new Thickness(10, 0, 10, 6) : new Thickness(24, 0, 24, 8);
     }
@@ -1116,7 +2435,7 @@ public partial class MainWindow : Window
             }
             _clientPeers = peers;
             _clientIconsAt = DateTime.UtcNow;
-            Dispatcher.Invoke(FillChatPeers);
+            await Dispatcher.InvokeAsync(FillChatPeers);
             await FillPeerHeadsAsync();
         }
         catch
@@ -1817,6 +3136,55 @@ public partial class MainWindow : Window
         return value is T typed ? typed : default!;
     }
 
+    private readonly ObservableCollection<BellNote> _bell = new();
+    private bool _bellSeeded;
+
+    /// <summary>Счётчик на колокольчике: новые сообщения и новые предложения вместе.</summary>
+    private void PushBell(BellNote note)
+    {
+        _bell.Insert(0, note);
+        while (_bell.Count > 40) _bell.RemoveAt(_bell.Count - 1);
+        BellList.ItemsSource = _bell;
+        BellEmpty.Visibility = Visibility.Collapsed;
+        var count = _bell.Count;
+        BellBadgeText.Text = count > 99 ? "99+" : count.ToString();
+        BellBadge.Visibility = Visibility.Visible;
+    }
+
+    private void OnBellClick(object sender, RoutedEventArgs e)
+    {
+        BellPanel.Visibility = BellPanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (BellPanel.Visibility == Visibility.Visible)
+        {
+            // Открыли панель — счётчик обнуляется, записи остаются.
+            BellBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnBellClearClick(object sender, RoutedEventArgs e)
+    {
+        _bell.Clear();
+        BellList.ItemsSource = _bell;
+        BellEmpty.Visibility = Visibility.Visible;
+        BellBadge.Visibility = Visibility.Collapsed;
+        BellPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnBellItemClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: BellNote note }) return;
+        BellPanel.Visibility = Visibility.Collapsed;
+        if (note.Kind == "ad")
+        {
+            if (Nav.SelectedIndex != 8) Nav.SelectedIndex = 8;
+            return;
+        }
+        Nav.SelectedIndex = 6;
+        OpenDirectChat(note.PeerId, note.PeerName, true);
+    }
+
     private void TrackUnread(ChatMessage message)
     {
         if (message.Mine) return;
@@ -1824,6 +3192,17 @@ public partial class MainWindow : Window
         _chatUnread++;
         ChatBadgeText.Text = _chatUnread > 99 ? "99+" : _chatUnread.ToString();
         ChatBadge.Visibility = Visibility.Visible;
+        PushBell(new BellNote
+        {
+            Kind = "chat",
+            Title = string.IsNullOrWhiteSpace(message.Author) ? "Новое сообщение" : message.Author,
+            Body = string.IsNullOrWhiteSpace(message.Text) ? "изображение" : message.Text,
+            TimeLabel = string.IsNullOrWhiteSpace(message.TimeLabel)
+                ? DateTime.Now.ToString("HH:mm")
+                : message.TimeLabel,
+            PeerId = message.InstanceId,
+            PeerName = message.Author,
+        });
         ShowChatToast(message);
         PlayChatSound(message);
     }
@@ -1999,7 +3378,7 @@ public partial class MainWindow : Window
             var chatOpen = false;
             try
             {
-                chatOpen = (bool)Dispatcher.Invoke(() => Nav.SelectedIndex == 6 && IsActive);
+                chatOpen = (bool)await Dispatcher.InvokeAsync(() => Nav.SelectedIndex == 6 && IsActive);
             }
             catch
             {
@@ -2013,7 +3392,7 @@ public partial class MainWindow : Window
                 var senderId = item.Str("instance_id");
                 if (!string.IsNullOrEmpty(senderId) && senderId == mine) continue;
                 if (chatOpen) continue;
-                Dispatcher.Invoke(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     var incoming = new ChatMessage
                     {
@@ -2501,12 +3880,24 @@ public partial class MainWindow : Window
     }
 
     private static readonly Dictionary<string, BitmapSource?> SkinCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> SkinPending = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HttpClient SkinHttp = new(new HttpClientHandler { AutomaticDecompression = System.Net.DecompressionMethods.All })
     {
         Timeout = TimeSpan.FromSeconds(30),
     };
 
-    private static ImageSource? LoadImage(string? url)
+    private static ImageSource? LoadCachedImage(string? url)
+    {
+        var full = string.IsNullOrWhiteSpace(url) ? "" : url;
+        if (full.StartsWith("//", StringComparison.Ordinal)) full = "https:" + full;
+        if (string.IsNullOrWhiteSpace(full)) return null;
+        lock (SkinCache)
+        {
+            return SkinCache.TryGetValue(full, out var hit) ? hit : null;
+        }
+    }
+
+    private static async Task<ImageSource?> LoadImageAsync(string? url)
     {
         var full = string.IsNullOrWhiteSpace(url) ? "" : url;
         if (full.StartsWith("//", StringComparison.Ordinal)) full = "https:" + full;
@@ -2517,7 +3908,7 @@ public partial class MainWindow : Window
         }
         try
         {
-            var bytes = SkinHttp.GetByteArrayAsync(full).GetAwaiter().GetResult();
+            var bytes = await SkinHttp.GetByteArrayAsync(full).ConfigureAwait(false);
             var image = DecodeSkin(bytes);
             lock (SkinCache) SkinCache[full] = image;
             return image;
@@ -2527,6 +3918,39 @@ public partial class MainWindow : Window
             lock (SkinCache) SkinCache[full] = null;
             return null;
         }
+    }
+
+    private static ImageSource? LoadImage(string? url)
+    {
+        var full = string.IsNullOrWhiteSpace(url) ? "" : url;
+        if (full.StartsWith("//", StringComparison.Ordinal)) full = "https:" + full;
+        if (string.IsNullOrWhiteSpace(full)) return null;
+        lock (SkinCache)
+        {
+            if (SkinCache.TryGetValue(full, out var hit)) return hit;
+        }
+        // Грузим в фоне, но не держим UI-поток: картинка догрузится следующим вызовом из кэша.
+        lock (SkinPending)
+        {
+            if (!SkinPending.Add(full)) return null;
+        }
+        _ = Task.Run(async () =>
+        {
+            BitmapSource? image = null;
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                var bytes = await SkinHttp.GetByteArrayAsync(full, cts.Token).ConfigureAwait(false);
+                image = DecodeSkin(bytes);
+            }
+            catch
+            {
+                image = null;
+            }
+            lock (SkinCache) SkinCache[full] = image;
+            lock (SkinPending) SkinPending.Remove(full);
+        });
+        return null;
     }
 
     /// <summary>Декодирует PNG/JPEG из байтов; из старых 64×64 скинов берёт голову.</summary>

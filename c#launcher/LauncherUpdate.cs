@@ -13,11 +13,46 @@ public static class LauncherUpdate
     private const string Repo = "daniprocrut-ui/craftunity";
     private const string ManifestUrl = "https://daniprocrut-ui.github.io/craftunity/manifest.json";
 
-    public sealed record Release(string Version, string Url, string Sha256);
+    public sealed record Release(string Version, string Url, string Sha256, string[] Mirrors)
+    {
+        public IEnumerable<string> Candidates()
+        {
+            yield return Url;
+            foreach (var mirror in Mirrors ?? Array.Empty<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(mirror) && !string.Equals(mirror, Url, StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return mirror;
+                }
+            }
+        }
+    }
+
+    private static void Log(string line)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Craftunity");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "update.log"),
+                $"{DateTime.Now:HH:mm:ss} {line}{Environment.NewLine}");
+        }
+        catch
+        {
+            // журнал не критичен
+        }
+    }
+
+    private static HttpClient CreateHttp(TimeSpan timeout)
+    {
+        var client = new HttpClient { Timeout = timeout };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("CraftunityLauncher/1.6 (+https://craftunity.mcsh.io)");
+        return client;
+    }
 
     public static async Task<Release?> CheckAsync(string currentVersion)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
+        using var http = CreateHttp(TimeSpan.FromSeconds(15));
         var text = await http.GetStringAsync(ManifestUrl);
         using var doc = JsonDocument.Parse(text);
         if (!doc.RootElement.TryGetProperty("launcher", out var launcher)) return null;
@@ -27,8 +62,18 @@ public static class LauncherUpdate
         var url = u.GetString() ?? "";
         var sha = (s.GetString() ?? "").ToLowerInvariant();
         if (string.IsNullOrEmpty(version) || !url.Contains("/releases/download/", StringComparison.OrdinalIgnoreCase)) return null;
+        var mirrors = new List<string>();
+        if (launcher.TryGetProperty("mirrors", out var list) && list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in list.EnumerateArray())
+            {
+                var link = item.GetString() ?? "";
+                if (link.StartsWith("http", StringComparison.OrdinalIgnoreCase)) mirrors.Add(link);
+            }
+        }
+        Log($"manifest version={version} current={currentVersion} mirrors={mirrors.Count}");
         if (Compare(version, currentVersion) <= 0) return null;
-        return new Release(version, url, sha);
+        return new Release(version, url, sha, mirrors.ToArray());
     }
 
     public static async Task<string?> DownloadAsync(Release release, Action<double>? progress = null)
@@ -36,33 +81,55 @@ public static class LauncherUpdate
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Craftunity", "update");
         Directory.CreateDirectory(dir);
         var target = Path.Combine(dir, $"Craftunity_Setup_{release.Version}.exe");
-        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        using var response = await http.GetAsync(release.Url, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-        var total = response.Content.Headers.ContentLength ?? -1;
-        await using (var source = await response.Content.ReadAsStreamAsync())
-        await using (var file = File.Create(target))
+        foreach (var candidate in release.Candidates())
         {
-            var buffer = new byte[81920];
-            long done = 0;
-            int read;
-            while ((read = await source.ReadAsync(buffer)) > 0)
+            try
             {
-                await file.WriteAsync(buffer.AsMemory(0, read));
-                done += read;
-                if (total > 0) progress?.Invoke((double)done / total);
+                Log("download " + candidate);
+                using var http = CreateHttp(TimeSpan.FromMinutes(10));
+                using var response = await http.GetAsync(candidate, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+                var total = response.Content.Headers.ContentLength ?? -1;
+                await using (var source = await response.Content.ReadAsStreamAsync())
+                await using (var file = File.Create(target))
+                {
+                    var buffer = new byte[81920];
+                    long done = 0;
+                    int read;
+                    while ((read = await source.ReadAsync(buffer)) > 0)
+                    {
+                        await file.WriteAsync(buffer.AsMemory(0, read));
+                        done += read;
+                        if (total > 0) progress?.Invoke((double)done / total);
+                    }
+                }
+                if (!string.IsNullOrEmpty(release.Sha256))
+                {
+                    var actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(target))).ToLowerInvariant();
+                    if (!string.Equals(actual, release.Sha256, StringComparison.Ordinal))
+                    {
+                        Log($"sha mismatch {candidate} got={actual[..Math.Min(12, actual.Length)]}");
+                        File.Delete(target);
+                        continue;
+                    }
+                }
+                Log("downloaded " + target);
+                return target;
+            }
+            catch (Exception exc)
+            {
+                Log($"download failed {exc.GetType().Name}: {exc.Message}");
+                try
+                {
+                    if (File.Exists(target)) File.Delete(target);
+                }
+                catch
+                {
+                    // файл удалим при следующей попытке
+                }
             }
         }
-        if (!string.IsNullOrEmpty(release.Sha256))
-        {
-            var actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(target))).ToLowerInvariant();
-            if (!string.Equals(actual, release.Sha256, StringComparison.Ordinal))
-            {
-                File.Delete(target);
-                return null;
-            }
-        }
-        return target;
+        return null;
     }
 
     public static bool RunInstaller(string path)

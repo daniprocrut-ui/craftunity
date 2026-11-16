@@ -110,7 +110,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="16,10"/>
-        <Setter Property="Height" Value="58"/>
+        <Setter Property="MinHeight" Value="58"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
@@ -120,11 +120,24 @@
                     <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10"
                             Padding="{TemplateBinding Padding}">
-                        <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
+                        <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Stretch"/>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="BorderBrush" Value="{DynamicResource CardHoverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="AdField" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="MinHeight" Value="40"/>
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
     <Style TargetType="PasswordBox">
