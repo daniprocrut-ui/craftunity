@@ -10,6 +10,7 @@ const VIEW_META = {
   account: ["Аккаунт", "Оффлайн-профиль или ely.by"],
   chat: ["Чат", "Общий чат, объявления, новости и личные сообщения"],
   ads: ["Объявления", "Купить или продать предметы: предложения и решения автора"],
+  news: ["Новости", "Что нового на сервере: публикует только Danipro914"],
   settings: ["Настройки", "Java, память, темы, манифест обновлений"],
 };
 
@@ -405,6 +406,33 @@ function adCardHtml(ad) {
   </div>`;
 }
 
+const NEWS = [
+  { id: 3, author: "Danipro914", mine: true, time: "16.11 · 12:40", text: "Обновление 1.6.0: объявления между игроками, отдельная вкладка Новости, панель уведомлений и полный список предметов." },
+  { id: 2, author: "Danipro914", mine: true, time: "15.11 · 18:05", text: "Новости теперь видны всем на главной странице лаунчера." },
+  { id: 1, author: "Danipro914", mine: true, time: "15.11 · 12:00", text: "Чат появился в лаунчере: общий чат, объявления и личные сообщения с уведомлениями." },
+];
+
+function newsCardHtml(item) {
+  return `<div class="ad-card">
+    <div class="ad-main">
+      <div class="ad-title"><b>${item.author}</b><span class="muted small"> ${item.time}</span></div>
+      <div class="ad-line">${item.text}</div>
+    </div>
+    <div class="ad-actions">
+      <button class="btn small" data-demo-play disabled>Изменить</button>
+      <button class="btn small" data-demo-play disabled>Удалить</button>
+    </div>
+  </div>`;
+}
+
+function renderNews() {
+  const list = $("#newsList");
+  if (!list) return;
+  list.innerHTML = [...NEWS].sort((a, b) => b.id - a.id).map(newsCardHtml).join("");
+  const stateEl = $("#newsState");
+  if (stateEl) stateEl.textContent = `Новостей: ${NEWS.length} · публикует только Danipro914`;
+}
+
 function renderAds() {
   const list = $("#adsList");
   if (!list) return;
@@ -527,6 +555,7 @@ function showView(id) {
   }
   if (id === "skin") drawSkin();
   if (id === "ads") renderAds();
+  if (id === "news") renderNews();
 }
 
 function drawSkin() {

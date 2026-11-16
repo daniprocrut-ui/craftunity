@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Craftunity Launcher 1.5.46 — демо</title>
+<title>Craftunity Launcher 1.6.0 — демо</title>
 <link rel="icon" href="../icons/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="../icons/icon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="../icons/icon-180.png">
@@ -636,11 +636,12 @@ input[readonly] { opacity: .8; }
       <button data-view="account"><span class="ico">◉</span><span class="lbl">Аккаунт</span></button>
       <button data-view="chat"><span class="ico">✉</span><span class="lbl">Чат</span><i class="badge" id="chatBadge" hidden>2</i></button>
       <button data-view="ads"><span class="ico">📢</span><span class="lbl">Объявления</span></button>
+      <button data-view="news"><span class="ico">📰</span><span class="lbl">Новости</span></button>
       <button data-view="settings"><span class="ico">⚙</span><span class="lbl">Настройки</span></button>
     </nav>
     <div class="side-foot">
       <div class="net"><span class="dot ok"></span><span>Сервер доступен</span></div>
-      <div>Версия лаунчера <span id="launcherVer">1.5.46</span></div>
+      <div>Версия лаунчера <span id="launcherVer">1.6.0</span></div>
       <div>craftunity.mcsh.io</div>
     </div>
   </aside>
@@ -875,6 +876,29 @@ input[readonly] { opacity: .8; }
         <div class="ads-list" id="adsList"></div>
       </section>
 
+      <!-- НОВОСТИ -->
+      <section class="view" id="view-news">
+        <div class="card mb">
+          <div class="ads-head">
+            <div>
+              <h3>Новости</h3>
+              <p class="muted small" id="newsState">Публикует только Danipro914. Новости видны всем на главной.</p>
+            </div>
+            <div class="ads-head-actions">
+              <button class="btn small" id="newsRefresh">Обновить</button>
+            </div>
+          </div>
+          <div class="ads-form" id="newsComposer">
+            <textarea id="newsInput" class="news-input" maxlength="2000" placeholder="Что нового на сервере?"></textarea>
+            <div class="ads-form-actions">
+              <button class="btn primary small" id="newsPublish">Опубликовать</button>
+              <span class="muted small" id="newsHint"></span>
+            </div>
+          </div>
+        </div>
+        <div class="ads-list" id="newsList"></div>
+      </section>
+
       <!-- НАСТРОЙКИ -->
       <section class="view" id="view-settings">
         <div class="card mb">
@@ -917,7 +941,7 @@ input[readonly] { opacity: .8; }
       </section>
     </div>
 
-    <div class="statusbar"><span id="statusText">Готово к запуску</span><span>v1.5.46</span></div>
+    <div class="statusbar"><span id="statusText">Готово к запуску</span><span>v1.6.0</span></div>
   </div>
 </div>
 
@@ -940,6 +964,7 @@ const VIEW_META = {
   account: ["Аккаунт", "Оффлайн-профиль или ely.by"],
   chat: ["Чат", "Общий чат, объявления, новости и личные сообщения"],
   ads: ["Объявления", "Купить или продать предметы: предложения и решения автора"],
+  news: ["Новости", "Что нового на сервере: публикует только Danipro914"],
   settings: ["Настройки", "Java, память, темы, манифест обновлений"],
 };
 
@@ -1335,6 +1360,33 @@ function adCardHtml(ad) {
   </div>`;
 }
 
+const NEWS = [
+  { id: 3, author: "Danipro914", mine: true, time: "16.11 · 12:40", text: "Обновление 1.6.0: объявления между игроками, отдельная вкладка Новости, панель уведомлений и полный список предметов." },
+  { id: 2, author: "Danipro914", mine: true, time: "15.11 · 18:05", text: "Новости теперь видны всем на главной странице лаунчера." },
+  { id: 1, author: "Danipro914", mine: true, time: "15.11 · 12:00", text: "Чат появился в лаунчере: общий чат, объявления и личные сообщения с уведомлениями." },
+];
+
+function newsCardHtml(item) {
+  return `<div class="ad-card">
+    <div class="ad-main">
+      <div class="ad-title"><b>${item.author}</b><span class="muted small"> ${item.time}</span></div>
+      <div class="ad-line">${item.text}</div>
+    </div>
+    <div class="ad-actions">
+      <button class="btn small" data-demo-play disabled>Изменить</button>
+      <button class="btn small" data-demo-play disabled>Удалить</button>
+    </div>
+  </div>`;
+}
+
+function renderNews() {
+  const list = $("#newsList");
+  if (!list) return;
+  list.innerHTML = [...NEWS].sort((a, b) => b.id - a.id).map(newsCardHtml).join("");
+  const stateEl = $("#newsState");
+  if (stateEl) stateEl.textContent = `Новостей: ${NEWS.length} · публикует только Danipro914`;
+}
+
 function renderAds() {
   const list = $("#adsList");
   if (!list) return;
@@ -1457,6 +1509,7 @@ function showView(id) {
   }
   if (id === "skin") drawSkin();
   if (id === "ads") renderAds();
+  if (id === "news") renderNews();
 }
 
 function drawSkin() {
