@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#08090c">
 <meta name="description" content="Craftunity — собственный лаунчер для сервера craftunity3.mcsh.io. Один файл, без установки.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Craftunity">
+<meta property="og:title" content="Лаунчер Craftunity — скачать">
+<meta property="og:description" content="Собственный лаунчер для сервера craftunity3.mcsh.io: один файл без установки, чат, объявления, моды в один клик.">
+<meta property="og:url" content="https://daniprocrut-ui.github.io/craftunity/">
+<meta property="og:image" content="https://daniprocrut-ui.github.io/craftunity/icons/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Лаунчер Craftunity — скачать">
+<meta name="twitter:description" content="Один файл без установки: чат, объявления, моды в один клик.">
+<meta name="twitter:image" content="https://daniprocrut-ui.github.io/craftunity/icons/icon-512.png">
 <title>Craftunity — скачать лаунчер</title>
 <link rel="icon" href="icons/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
@@ -489,6 +501,119 @@
     flex-wrap: wrap;
   }
 
+  /* ---------- новые блоки ---------- */
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 26px;
+  }
+
+  .hero-note {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .whatsnew {
+    display: grid;
+    gap: 4px;
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 138, 61, 0.32);
+    background: linear-gradient(180deg, rgba(255, 138, 61, 0.12), rgba(255, 138, 61, 0.03));
+    font-size: 14.5px;
+    color: var(--text-soft);
+  }
+
+  .whatsnew b { color: var(--accent); font-weight: 650; }
+
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .shot {
+    position: relative;
+    display: block;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    background: var(--card-solid);
+    text-decoration: none;
+  }
+
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    transition: transform 0.25s ease;
+  }
+
+  .shot span {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: rgba(8, 9, 12, 0.78);
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 550;
+    backdrop-filter: blur(6px);
+  }
+
+  .shot:hover img { transform: scale(1.025); }
+
+  .changelog {
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .changelog li {
+    display: grid;
+    grid-template-columns: 74px 1fr;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14.5px;
+    color: var(--text-soft);
+  }
+
+  .changelog li:last-child { border-bottom: 0; }
+
+  .changelog b {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+
+  details {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  details summary {
+    cursor: pointer;
+    font-weight: 550;
+    color: var(--text);
+    font-size: 15px;
+  }
+
+  details[open] summary { margin-bottom: 8px; }
+
+  details p { margin: 0; font-size: 14.5px; }
+
   /* ---------- responsive ---------- */
 
   @media (max-width: 640px) {
@@ -499,6 +624,9 @@
     .card, .card.primary { padding: 20px; border-radius: 16px; }
     dl.info { grid-template-columns: 1fr; }
     .dl-actions .btn { flex: 1 1 100%; }
+    .hero-actions .btn { flex: 1 1 100%; }
+    .shots { grid-template-columns: 1fr; }
+    .changelog li { grid-template-columns: 1fr; gap: 2px; }
     footer { flex-direction: column; gap: 4px; }
   }
 
@@ -524,6 +652,18 @@
       <div class="eyebrow"><span class="dot" aria-hidden="true"></span>Сервер работает · craftunity3.mcsh.io</div>
       <h1>Лаунчер <span class="accent">Craftunity</span></h1>
       <p class="lead">Собственный лаунчер для сервера craftunity3.mcsh.io. Один файл без установки: скачал и запустил.</p>
+      <div class="hero-actions">
+        <a class="btn" href="#download">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>
+          Скачать лаунчер
+        </a>
+        <a id="hero-demo-btn" class="btn secondary demo-card-btn" href="demo/lite.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H4z"/><path d="M9 21h6"/><path d="M12 16v5"/></svg>
+          Посмотреть в браузере
+          <span class="demo-arrow" aria-hidden="true">→</span>
+        </a>
+        <span class="hero-note">Демо без установки · версия 1.6.0</span>
+      </div>
     </header>
 
     <section class="card primary" id="download">
@@ -548,6 +688,33 @@
         </a>
       </div>
       <div id="notes" class="notes"></div>
+      <div class="whatsnew" id="whatsnew">
+        <b>Что нового в 1.6.0</b>
+        <span>Объявления между игроками (предложения и решения автора), вкладка «Новости», панель уведомлений и полный список предметов.</span>
+      </div>
+    </section>
+
+    <section class="card" id="screens">
+      <h2>Как это выглядит</h2>
+      <p class="sub">Реальные экраны лаунчера 1.6.0. Кликните по кадру, чтобы открыть демо в браузере.</p>
+      <div class="shots">
+        <a class="shot" href="demo/lite.html">
+          <img src="shots/play.png" alt="Экран «Играть» в лаунчере Craftunity" width="1000" height="627" loading="lazy">
+          <span>Играть</span>
+        </a>
+        <a class="shot" href="demo/lite.html">
+          <img src="shots/mods.png" alt="Каталог модов с установкой в один клик" width="1000" height="627" loading="lazy">
+          <span>Контент</span>
+        </a>
+        <a class="shot" href="demo/lite.html">
+          <img src="shots/chat.png" alt="Чат лаунчера: общий чат, объявления и личные сообщения" width="1000" height="627" loading="lazy">
+          <span>Чат</span>
+        </a>
+        <a class="shot" href="demo/lite.html">
+          <img src="shots/ads.png" alt="Объявления игроков: продаю и куплю" width="1000" height="627" loading="lazy">
+          <span>Объявления</span>
+        </a>
+      </div>
     </section>
 
     <section class="card" id="help">
@@ -588,6 +755,52 @@
         <li>В лаунчере войдите по нику или через аккаунт ely.by.</li>
         <li>Нажмите кнопку &laquo;Играть&raquo; и ждите загрузки.</li>
       </ol>
+    </section>
+
+    <section class="card" id="versions">
+      <h2>История версий</h2>
+      <p class="sub">Что менялось в последних выпусках. Полный список — в <a href="https://github.com/daniprocrut-ui/craftunity/releases" target="_blank" rel="noopener">релизах на GitHub</a>.</p>
+      <ol class="changelog">
+        <li><b>1.6.0</b><span>Объявления между игроками, вкладка «Новости», панель уведомлений, полный список предметов, исправлены зависания.</span></li>
+        <li><b>1.5.47</b><span>Удаление личных чатов, правка и удаление новостей, новости на главной.</span></li>
+        <li><b>1.5.46</b><span>Страница объявлений с предложениями и решениями автора.</span></li>
+        <li><b>1.5.45</b><span>Карта BlueMap в отдельном окне WebView2.</span></li>
+        <li><b>1.5.40</b><span>Цветные реакции, ответы на сообщения, иконки чатов.</span></li>
+      </ol>
+    </section>
+
+    <section class="card" id="requirements">
+      <h2>Требования</h2>
+      <dl class="info">
+        <div><dt>Система</dt><dd>Windows 10 или 11, 64 бита</dd></div>
+        <div><dt>Java</dt><dd>17 или 21, скачивается автоматически</dd></div>
+        <div><dt>Место на диске</dt><dd>около 1,5 ГБ на клиент и моды</dd></div>
+        <div><dt>Интернет</dt><dd>нужен для первой загрузки клиента</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="faq">
+      <h2>Частые вопросы</h2>
+      <details>
+        <summary>Антивирус или SmartScreen ругается на файл</summary>
+        <p>Это нормально для файла без подписи кода. Нажмите «Подробнее» и «Выполнить в любом случае», либо разблокируйте файл в свойствах. Подробнее — в блоке про Windows выше.</p>
+      </details>
+      <details>
+        <summary>Низкий FPS в игре</summary>
+        <p>Во вкладке «Контент» поставьте Sodium и Iris, а в «Настройках» дайте памяти 4–6 ГБ. Шейдеры включите только на средней видеокарте.</p>
+      </details>
+      <details>
+        <summary>Клиент не скачивается или зависает</summary>
+        <p>Проверьте, что сервер craftunity3.mcsh.io доступен, и нажмите «Проверить файлы» на вкладке «Играть». Лаунчер докачает только недостающие файлы.</p>
+      </details>
+      <details>
+        <summary>Забыл пароль от ely.by</summary>
+        <p>Пароль восстанавливается на account.ely.by. Лаунчер его не хранит — передаёт напрямую на сервер авторизации.</p>
+      </details>
+      <details>
+        <summary>Можно играть без лаунчера</summary>
+        <p>Да, адрес для обычного Minecraft — craftunity3.mcsh.io:25565. Но моды, скины и чат лаунчера работать не будут.</p>
+      </details>
     </section>
 
     <section class="card" id="server">
