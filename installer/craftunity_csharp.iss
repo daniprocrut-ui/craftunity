@@ -44,6 +44,11 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\CraftunityLauncher.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\CraftunityLauncher.exe"; Tasks: desktopicon
 
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\craftunity"; ValueType: string; ValueName: ""; ValueData: "URL:Craftunity Launcher"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\craftunity"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\craftunity\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\CraftunityLauncher.exe"" ""%1"""; Flags: uninsdeletekey
+
 [Run]
 Filename: "{app}\CraftunityLauncher.exe"; Description: "Запустить {#AppName}"; Flags: nowait postinstall skipifsilent
 
