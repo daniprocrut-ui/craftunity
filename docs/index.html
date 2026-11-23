@@ -677,6 +677,77 @@
     padding: 1px 5px;
   }
 
+  .cmp-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    margin-top: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table.cmp {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+    font-size: 14px;
+    table-layout: auto;
+  }
+
+  table.cmp th,
+  table.cmp td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  table.cmp thead th {
+    position: sticky;
+    top: 0;
+    background: var(--card-solid);
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  table.cmp tbody th {
+    font-weight: 500;
+    color: var(--text-soft);
+  }
+
+  table.cmp td { color: var(--muted); }
+
+  table.cmp tr:last-child th,
+  table.cmp tr:last-child td { border-bottom: 0; }
+
+  .cmp-us {
+    background: var(--accent-soft);
+    color: var(--text) !important;
+  }
+
+  table.cmp thead th.cmp-us { color: var(--accent) !important; }
+  table.cmp td.cmp-us { font-weight: 550; }
+
+  .cmp .yes, .cmp .no, .cmp .partial { white-space: nowrap; }
+
+  .cmp .yes { color: #7ee2a8; }
+  .cmp .no { color: var(--muted); }
+  .cmp .partial { color: var(--warning); }
+
+  .cmp a { color: var(--accent); text-decoration: none; }
+  .cmp a:hover { text-decoration: underline; }
+
+  .cmp-note {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
   .changelog {
     margin: 14px 0 0;
     padding: 0;
@@ -752,6 +823,7 @@
         <a href="#help">Помощь</a>
         <a href="#howto">Как играть</a>
         <a href="#server">Сервер</a>
+        <a href="#compare">Сравнение</a>
         <a class="topbar-gh" id="gh-link" href="https://github.com/daniprocrut-ui/craftunity" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
@@ -919,7 +991,97 @@
       </dl>
     </section>
 
-    <section class="card" id="faq">
+    <section class="card" id="compare">
+      <h2>Сравнение</h2>
+      <p class="sub">Craftunity против популярных способов играть на своём сервере.</p>
+      <div class="cmp-wrap">
+        <table class="cmp">
+          <thead>
+            <tr>
+              <th scope="col">Что сравниваем</th>
+              <th scope="col" class="cmp-us">Craftunity</th>
+              <th scope="col">TLauncher</th>
+              <th scope="col">Prism Launcher</th>
+              <th scope="col">Ваниль</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Сборка сервера из коробки</th>
+              <td class="cmp-us"><span class="yes">да</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="partial">своими руками</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Моды в один клик</th>
+              <td class="cmp-us"><span class="yes">да, каталог</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="partial">через CurseForge</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Чат и личные сообщения в лаунчере</th>
+              <td class="cmp-us"><span class="yes">да</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Объявления «продаю / куплю»</th>
+              <td class="cmp-us"><span class="yes">да</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Скины сервера без настройки</th>
+              <td class="cmp-us"><span class="yes">да</span></td>
+              <td><span class="partial">через аккаунт</span></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Аккаунт ely.by</th>
+              <td class="cmp-us"><span class="yes">да</span></td>
+              <td><span class="partial">не во всех версиях</span></td>
+              <td><span class="yes">да</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Свои сборки и другие серверы</th>
+              <td class="cmp-us"><span class="partial">только этот сервер</span></td>
+              <td><span class="yes">да</span></td>
+              <td><span class="yes">да, любые</span></td>
+              <td><span class="yes">да</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Обновление лаунчера</th>
+              <td class="cmp-us"><span class="yes">автоматически</span></td>
+              <td><span class="partial">вручную</span></td>
+              <td><span class="partial">вручную</span></td>
+              <td><span class="no">нет лаунчера</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Скачивание игры и Java</th>
+              <td class="cmp-us"><span class="yes">сам</span></td>
+              <td><span class="yes">сам</span></td>
+              <td><span class="yes">сам</span></td>
+              <td><span class="partial">сам из интерфейса</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Открытый исходный код</th>
+              <td class="cmp-us"><a href="https://github.com/daniprocrut-ui/craftunity" target="_blank" rel="noopener">да</a></td>
+              <td><span class="no">нет</span></td>
+              <td><span class="yes">да</span></td>
+              <td><span class="no">нет</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cmp-note">Сравнение по общедоступным возможностям проектов на момент публикации. Craftunity — лаунчер одного сервера: других серверов и своих сборок в нём нет. Функции сторонних лаунчеров могут меняться — сверяйтесь с их сайтами.</p>
+    </section>
+
       <h2>Частые вопросы</h2>
       <details>
         <summary>Антивирус или SmartScreen ругается на файл</summary>
