@@ -1,0 +1,55 @@
+name: Сообщение о проблеме
+description: Лаунчер не запускается, падает или что-то работает не так
+title: "[Проблема] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что сообщаете о проблеме. Чем точнее описание, тем быстрее починим.
+  - type: input
+    id: version
+    attributes:
+      label: Версия лаунчера
+      description: Видна внизу бокового меню и в поле «Версия лаунчера» на сайте.
+      placeholder: "1.6.3"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows
+      description: Версия и разрядность.
+      placeholder: "Windows 11, 64 бита"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Что вы делали, что ожидали и что получилось.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      description: Шаги по порядку, если можно повторить.
+      placeholder: |
+        1. Открыть вкладку «Контент»
+        2. Установить мод
+        3. Лаунчер закрывается
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи
+      description: |
+        Приложите файлы `%APPDATA%\Craftunity\launcher.log` и
+        `%APPDATA%\Craftunity\game\logs\latest.log`. Старые или большие логи можно
+        вставить текстом — уберите оттуда личные данные, если они есть.
+      render: text
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Скриншот
+      description: Перетащите картинку в это поле, если проблема видна на экране.

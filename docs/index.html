@@ -570,6 +570,113 @@
 
   .shot:hover img { transform: scale(1.025); }
 
+  .shot {
+    padding: 0;
+    cursor: zoom-in;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+
+  .shots-note {
+    margin: 14px 0 0;
+    font-size: 14.5px;
+  }
+
+  .demo-link {
+    color: var(--accent);
+    font-weight: 550;
+  }
+
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(4, 5, 8, 0.86);
+    backdrop-filter: blur(6px);
+    cursor: zoom-out;
+  }
+
+  .lightbox img {
+    max-width: min(1180px, 100%);
+    max-height: 100%;
+    border-radius: 14px;
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  }
+
+  .topbar-gh {
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: 4px 12px !important;
+  }
+
+  .older {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .older-title {
+    margin: 0 0 4px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .older-list {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+  }
+
+  .older-list li {
+    display: grid;
+    grid-template-columns: 74px 110px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .older-list li:last-child { border-bottom: 0; }
+
+  .older-ver {
+    font-family: var(--mono);
+    color: var(--text-soft);
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+
+  .older-list a { color: var(--accent); text-decoration: none; font-weight: 550; }
+  .older-list a:hover { text-decoration: underline; }
+
+  .older-warn {
+    margin: 10px 0 0;
+    font-size: 13.5px;
+    color: var(--warning);
+  }
+
+  .footer-links {
+    display: inline-flex;
+    gap: 16px;
+  }
+
+  .footer-links a { color: var(--text-soft); text-decoration: none; }
+  .footer-links a:hover { color: var(--accent); }
+
+  details code {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    padding: 1px 5px;
+  }
+
   .changelog {
     margin: 14px 0 0;
     padding: 0;
@@ -645,6 +752,7 @@
         <a href="#help">Помощь</a>
         <a href="#howto">Как играть</a>
         <a href="#server">Сервер</a>
+        <a class="topbar-gh" id="gh-link" href="https://github.com/daniprocrut-ui/craftunity" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
 
@@ -662,7 +770,7 @@
           Посмотреть в браузере
           <span class="demo-arrow" aria-hidden="true">→</span>
         </a>
-        <span class="hero-note">Демо без установки · версия 1.6.0</span>
+        <span class="hero-note">Демо без установки · версия <b id="hero-ver">1.6.3</b> · обновлено <b id="hero-date">23.11.2026</b></span>
       </div>
     </header>
 
@@ -689,8 +797,8 @@
       </div>
       <div id="notes" class="notes"></div>
       <div class="whatsnew" id="whatsnew">
-        <b>Что нового в 1.6.0</b>
-        <span>Объявления между игроками (предложения и решения автора), вкладка «Новости», панель уведомлений и полный список предметов.</span>
+        <b>Что нового в <span id="wn-ver">1.6.3</span></b>
+        <span id="wn-text">Установка модов перетаскиванием файла в лаунчер: .jar — мод, .zip — ресурспак.</span>
       </div>
     </section>
 
@@ -698,23 +806,24 @@
       <h2>Как это выглядит</h2>
       <p class="sub">Реальные экраны лаунчера 1.6.0. Кликните по кадру, чтобы открыть демо в браузере.</p>
       <div class="shots">
-        <a class="shot" href="demo/lite.html">
+        <button class="shot" type="button" data-full="shots/play.png">
           <img src="shots/play.png" alt="Экран «Играть» в лаунчере Craftunity" width="1000" height="627" loading="lazy">
           <span>Играть</span>
-        </a>
-        <a class="shot" href="demo/lite.html">
+        </button>
+        <button class="shot" type="button" data-full="shots/mods.png">
           <img src="shots/mods.png" alt="Каталог модов с установкой в один клик" width="1000" height="627" loading="lazy">
           <span>Контент</span>
-        </a>
-        <a class="shot" href="demo/lite.html">
+        </button>
+        <button class="shot" type="button" data-full="shots/chat.png">
           <img src="shots/chat.png" alt="Чат лаунчера: общий чат, объявления и личные сообщения" width="1000" height="627" loading="lazy">
           <span>Чат</span>
-        </a>
-        <a class="shot" href="demo/lite.html">
+        </button>
+        <button class="shot" type="button" data-full="shots/ads.png">
           <img src="shots/ads.png" alt="Объявления игроков: продаю и куплю" width="1000" height="627" loading="lazy">
           <span>Объявления</span>
-        </a>
+        </button>
       </div>
+      <p class="shots-note"><a href="demo/lite.html" class="demo-link">Открыть демо в браузере <span class="demo-arrow" aria-hidden="true">→</span></a></p>
     </section>
 
     <section class="card" id="help">
@@ -761,12 +870,43 @@
       <h2>История версий</h2>
       <p class="sub">Что менялось в последних выпусках. Полный список — в <a href="https://github.com/daniprocrut-ui/craftunity/releases" target="_blank" rel="noopener">релизах на GitHub</a>.</p>
       <ol class="changelog">
+        <li><b>1.6.3</b><span>Установка модов перетаскиванием файла в лаунчер: .jar — мод, .zip — ресурспак.</span></li>
+        <li><b>1.6.2</b><span>Экран входа до авторизации и профиль после; новый ЛС сразу в списке чатов; копирование ссылки не падает на занятом буфере.</span></li>
+        <li><b>1.6.1</b><span>Новости, объявления, профиль и уведомления; свой заголовок окна; мгновенная смена темы; исправлены счётчики непрочитанных.</span></li>
         <li><b>1.6.0</b><span>Объявления между игроками, вкладка «Новости», панель уведомлений, полный список предметов, исправлены зависания.</span></li>
-        <li><b>1.5.47</b><span>Удаление личных чатов, правка и удаление новостей, новости на главной.</span></li>
-        <li><b>1.5.46</b><span>Страница объявлений с предложениями и решениями автора.</span></li>
-        <li><b>1.5.45</b><span>Карта BlueMap в отдельном окне WebView2.</span></li>
-        <li><b>1.5.40</b><span>Цветные реакции, ответы на сообщения, иконки чатов.</span></li>
+        <li><b>1.5.47</b><span>Список личных собеседников постоянный; демо на сайте с одной страницы объявлений.</span></li>
       </ol>
+      <div class="older">
+        <p class="older-title">Предыдущие версии</p>
+        <p class="sub">Обычно ставить их не нужно. Берите только если новая версия на вашей системе не запускается — и вернитесь на актуальную, когда починим.</p>
+        <ul class="older-list">
+          <li>
+            <span class="older-ver">1.6.0</span>
+            <span class="older-date">16.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.6.0/Craftunity_Setup_1.6.0.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+          <li>
+            <span class="older-ver">1.5.47</span>
+            <span class="older-date">15.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.47/Craftunity_Setup_1.5.47.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+          <li>
+            <span class="older-ver">1.5.46</span>
+            <span class="older-date">15.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.46/Craftunity_Setup_1.5.46.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+          <li>
+            <span class="older-ver">1.5.45</span>
+            <span class="older-date">15.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.45/Craftunity_Setup_1.5.45.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+        </ul>
+        <p class="older-warn">Старая версия сама предложит обновиться до актуальной при запуске.</p>
+      </div>
     </section>
 
     <section class="card" id="requirements">
@@ -801,6 +941,22 @@
         <summary>Можно играть без лаунчера</summary>
         <p>Да, адрес для обычного Minecraft — craftunity3.mcsh.io:25565. Но моды, скины и чат лаунчера работать не будут.</p>
       </details>
+      <details>
+        <summary>Куда ставится сборка и моды</summary>
+        <p>Игра, моды и ресурспаки живут в папке лаунчера: <code>%APPDATA%\Craftunity</code> (вставьте путь в адресную строку «Проводника»). Ядро игры и библиотеки — в её подпапках <code>game</code> и <code>libraries</code>, ваши миры — в <code>game\saves</code>.</p>
+      </details>
+      <details>
+        <summary>Как перенести мир из обычного Minecraft</summary>
+        <p>Скопируйте папку мира в <code>%APPDATA%\Craftunity\game\saves</code> и запустите его в лаунчере во вкладке «Играть». Версия мира должна совпадать с версией сборки, иначе игра предупредит о риске.</p>
+      </details>
+      <details>
+        <summary>Лаунчер перезаписал свой exe при запуске — это нормально</summary>
+        <p>Да. Обновление идёт в два запуска: при первом лаунчер скачивает новую версию, при следующем подменяет файл и запускается уже обновлённым. Если вы обновились вручную из установщика, автоподмена ничего не тронет — версии совпадут.</p>
+      </details>
+      <details>
+        <summary>Где лежат логи</summary>
+        <p>Лог лаунчера — <code>%APPDATA%\Craftunity\launcher.log</code>, журналы игры — в <code>%APPDATA%\Craftunity\game\logs\latest.log</code>. Приложите их к сообщению о проблеме — так починим быстрее.</p>
+      </details>
     </section>
 
     <section class="card" id="server">
@@ -820,6 +976,10 @@
     <footer>
       <span id="server-footer">craftunity3.mcsh.io</span>
       <span>Craftunity &middot; лаунчер и сборка</span>
+      <span class="footer-links">
+        <a id="gh-footer" href="https://github.com/daniprocrut-ui/craftunity" target="_blank" rel="noopener">Исходный код</a>
+        <a id="issue-link" href="https://github.com/daniprocrut-ui/craftunity/issues/new?template=bug_report.yml" target="_blank" rel="noopener">Сообщить о проблеме</a>
+      </span>
     </footer>
   </div>
 
@@ -958,23 +1118,86 @@ copyBtn.addEventListener("click", function () {
   }
 });
 
-// Плавный переход на демо: гаснем и уходим вверх, затем открываем страницу.
+// Плавный переход на демо + лайтбокс скриншотов.
+function leaveTo(url) {
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.documentElement.classList.add("demo-leaving");
+  setTimeout(function () { window.location.href = url; }, reduce ? 0 : 320);
+}
+
 var demoBtn = document.getElementById("demo-btn");
 if (demoBtn) {
   demoBtn.addEventListener("click", function (event) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
-    var target = demoBtn.href;
-    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.documentElement.classList.add("demo-leaving");
-    var delay = reduce ? 0 : 320;
-    setTimeout(function () { window.location.href = target; }, delay);
-  });
-  // Назад со страницы демо: сразу показываем содержимое, без «пустого» кадра.
-  window.addEventListener("pageshow", function (event) {
-    if (event.persisted) document.documentElement.classList.remove("demo-leaving");
+    leaveTo(demoBtn.href);
   });
 }
+
+document.querySelectorAll("a.demo-link").forEach(function (link) {
+  link.addEventListener("click", function (event) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    leaveTo(link.href);
+  });
+});
+
+// Назад со страницы демо: сразу показываем содержимое, без «пустого» кадра.
+window.addEventListener("pageshow", function (event) {
+  if (event.persisted) document.documentElement.classList.remove("demo-leaving");
+});
+
+// Недавние выпуски: GitHub отдаёт список релизов без CORS-заголовков,
+// поэтому статичная копия лежит в releases.json и обновляется вручную.
+fetch("releases.json", { cache: "no-store" })
+  .then(function (res) { return res.ok ? res.json() : null; })
+  .then(function (list) {
+    if (!Array.isArray(list) || !list.length) return;
+    var latest = list[0];
+    if (latest.version) {
+      el("hero-ver", latest.version);
+      el("wn-ver", latest.version);
+    }
+    if (latest.date) el("hero-date", fmtDate(latest.date));
+    if (latest.notes) el("wn-text", latest.notes);
+    if (latest.url) downloadBtn.href = latest.url;
+  })
+  .catch(function () {});
+
+(function () {
+  var shots = document.querySelectorAll(".shot[data-full]");
+  if (!shots.length) return;
+  var box = null;
+
+  function close() {
+    if (!box) return;
+    box.remove();
+    box = null;
+    document.removeEventListener("keydown", onKey);
+    document.body.style.overflow = "";
+  }
+
+  function onKey(event) {
+    if (event.key === "Escape") close();
+  }
+
+  shots.forEach(function (shot) {
+    shot.addEventListener("click", function () {
+      var img = document.createElement("img");
+      img.src = shot.getAttribute("data-full");
+      img.alt = shot.querySelector("img") ? shot.querySelector("img").alt : "";
+      box = document.createElement("div");
+      box.className = "lightbox";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-label", "Скриншот лаунчера");
+      box.appendChild(img);
+      box.addEventListener("click", close);
+      document.body.appendChild(box);
+      document.body.style.overflow = "hidden";
+      document.addEventListener("keydown", onKey);
+    });
+  });
+})();
 </script>
 </body>
 </html>

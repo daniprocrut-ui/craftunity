@@ -1,0 +1,14 @@
+[
+  {
+    "version": "1.6.3",
+    "date": "2026-11-23T13:30:59Z",
+    "url": "https://github.com/daniprocrut-ui/craftunity/releases/download/v1.6.3/Craftunity_Setup_1.6.3.exe",
+    "notes": "Установка модов перетаскиванием файла в лаунчер: .jar — мод, .zip — ресурспак."
+  },
+  {
+    "version": "1.6.2",
+    "date": "2026-11-23T09:46:52Z",
+    "url": "https://github.com/daniprocrut-ui/craftunity/releases/download/v1.6.2/Craftunity_Setup_1.6.2.exe",
+    "notes": "Экран входа до авторизации и профиль после; новый ЛС сразу в списке чатов."
+  }
+]
