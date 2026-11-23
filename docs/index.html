@@ -533,9 +533,16 @@
   .hero-actions {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 26px;
+  }
+
+  @media (min-width: 1081px) {
+    .hero { display: flex; flex-direction: column; align-items: flex-start; }
+    .hero-actions { align-self: stretch; margin-top: 18px; }
+    .hero-note { margin-left: auto; }
   }
 
   .hero-note {
