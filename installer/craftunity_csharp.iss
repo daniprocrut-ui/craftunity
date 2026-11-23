@@ -50,7 +50,7 @@ Root: HKCU; Subkey: "Software\Classes\craftunity"; ValueType: string; ValueName:
 Root: HKCU; Subkey: "Software\Classes\craftunity\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\CraftunityLauncher.exe"" ""%1"""; Flags: uninsdeletekey
 
 [Run]
-Filename: "{app}\CraftunityLauncher.exe"; Description: "Запустить {#AppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\CraftunityLauncher.exe"; Description: "Запустить {#AppName}"; Flags: nowait postinstall
 
 [UninstallRun]
 Filename: "{app}\CraftunityLauncher.exe"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "cleanup"
