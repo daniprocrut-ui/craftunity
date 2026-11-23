@@ -88,10 +88,37 @@
   .wrap {
     position: relative;
     z-index: 1;
-    max-width: 880px;
     margin: 0 auto;
-    padding: 28px 24px 72px;
+    padding: 28px 40px 72px;
   }
+
+  /* Широкий макет: две колонки, скачивание слева, скриншоты справа. */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-areas:
+      "hero hero"
+      "download screens"
+      "help howto"
+      "versions compare"
+      "requirements requirements"
+      "faq server";
+    gap: 16px;
+    align-items: start;
+  }
+
+  .layout > section,
+  .layout > header { margin-bottom: 0; }
+
+  .layout > #download { grid-area: download; }
+  .layout > #screens { grid-area: screens; }
+  .layout > #help { grid-area: help; }
+  .layout > #howto { grid-area: howto; }
+  .layout > #versions { grid-area: versions; }
+  .layout > #compare { grid-area: compare; }
+  .layout > #requirements { grid-area: requirements; }
+  .layout > #faq { grid-area: faq; }
+  .layout > #server { grid-area: server; }
 
   /* ---------- top bar ---------- */
 
@@ -794,17 +821,42 @@
 
   /* ---------- responsive ---------- */
 
+  /* Узкая и средняя ширина: та же сетка, но карточки в одну колонку. */
+  @media (max-width: 1080px) {
+    .wrap { padding: 24px 24px 64px; }
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "hero"
+        "download"
+        "screens"
+        "help"
+        "howto"
+        "versions"
+        "compare"
+        "requirements"
+        "faq"
+        "server";
+      gap: 0;
+    }
+    .layout > section,
+    .layout > header { margin-bottom: 16px; }
+    .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
   @media (max-width: 640px) {
     .wrap { padding: 16px 16px 56px; }
     .topbar { padding: 12px 14px; }
     .topbar-nav { display: none; }
     .hero { padding: 40px 0 28px; }
     .card, .card.primary { padding: 20px; border-radius: 16px; }
-    dl.info { grid-template-columns: 1fr; }
+    dl.info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dl-actions .btn { flex: 1 1 100%; }
     .hero-actions .btn { flex: 1 1 100%; }
     .shots { grid-template-columns: 1fr; }
     .changelog li { grid-template-columns: 1fr; gap: 2px; }
+    .older-list li { grid-template-columns: 74px 1fr auto; }
+    .older-list li .older-date { display: none; }
     footer { flex-direction: column; gap: 4px; }
   }
 
@@ -828,6 +880,7 @@
       </nav>
     </div>
 
+    <main class="layout">
     <header class="hero">
       <div class="eyebrow"><span class="dot" aria-hidden="true"></span>Сервер работает · craftunity3.mcsh.io</div>
       <h1>Лаунчер <span class="accent">Craftunity</span></h1>
@@ -1082,6 +1135,7 @@
       <p class="cmp-note">Сравнение по общедоступным возможностям проектов на момент публикации. Craftunity — лаунчер одного сервера: других серверов и своих сборок в нём нет. Функции сторонних лаунчеров могут меняться — сверяйтесь с их сайтами.</p>
     </section>
 
+    <section class="card" id="faq">
       <h2>Частые вопросы</h2>
       <details>
         <summary>Антивирус или SmartScreen ругается на файл</summary>
@@ -1134,6 +1188,8 @@
       <div id="copy-status" class="copied" aria-live="polite"></div>
       <p style="color:var(--muted);margin:6px 0 0;font-size:14px">Порт по умолчанию &mdash; 25565, если он не указан.</p>
     </section>
+
+    </main>
 
     <footer>
       <span id="server-footer">craftunity3.mcsh.io</span>
