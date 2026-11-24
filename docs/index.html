@@ -95,27 +95,13 @@
   /* Широкий макет: две колонки, скачивание слева, скриншоты справа. */
   /* Две независимые колонки: карточки не тянутся под высоту соседа. */
   .layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    column-gap: 12px;
-    align-items: start;
-  }
-
-  .layout > .hero { grid-column: 1 / -1; }
-
-  .col {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-width: 0;
   }
 
   .layout > section,
-  .layout > header,
-  .col > section { margin-bottom: 0; }
-
-  /* Требования и сравнение — на всю ширину. */
-  .layout > .wide { grid-column: 1 / -1; }
+  .layout > header { margin-bottom: 0; }
 
   /* ---------- top bar ---------- */
 
@@ -304,7 +290,7 @@
 
   dl.info {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
     margin: 0 0 4px;
   }
@@ -563,7 +549,7 @@
 
   .shots {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     margin-top: 18px;
   }
@@ -903,8 +889,7 @@
       </div>
     </header>
 
-    <div class="col">
-<section class="card primary" id="download">
+    <section class="card primary" id="download">
       <h2>Скачать лаунчер</h2>
       <p class="sub">Актуальная версия и сборка подтягиваются автоматически.</p>
       <dl class="info">
@@ -931,7 +916,105 @@
         <span id="wn-text">Установка модов перетаскиванием файла в лаунчер: .jar — мод, .zip — ресурспак.</span>
       </div>
     </section>
-<section class="card" id="compare">
+
+    <section class="card" id="screens">
+      <h2>Как это выглядит</h2>
+      <p class="sub">Реальные экраны лаунчера 1.6.0. Кликните по кадру, чтобы открыть демо в браузере.</p>
+      <div class="shots">
+        <button class="shot" type="button" data-full="shots/play.png">
+          <img src="shots/play.png" alt="Экран «Играть» в лаунчере Craftunity" width="1000" height="627" loading="lazy">
+          <span>Играть</span>
+        </button>
+        <button class="shot" type="button" data-full="shots/mods.png">
+          <img src="shots/mods.png" alt="Каталог модов с установкой в один клик" width="1000" height="627" loading="lazy">
+          <span>Контент</span>
+        </button>
+        <button class="shot" type="button" data-full="shots/chat.png">
+          <img src="shots/chat.png" alt="Чат лаунчера: общий чат, объявления и личные сообщения" width="1000" height="627" loading="lazy">
+          <span>Чат</span>
+        </button>
+        <button class="shot" type="button" data-full="shots/ads.png">
+          <img src="shots/ads.png" alt="Объявления игроков: продаю и куплю" width="1000" height="627" loading="lazy">
+          <span>Объявления</span>
+        </button>
+      </div>
+      <p class="shots-note"><a href="demo/lite.html" class="demo-link">Открыть демо в браузере <span class="demo-arrow" aria-hidden="true">→</span></a></p>
+    </section>
+
+    <section class="card" id="help">
+      <h2>Windows не даёт запустить файл?</h2>
+      <p class="sub">SmartScreen предупреждает о файлах без цифровой репутации — это нормально для маленьких проектов. Вот как пройти окно.</p>
+
+      <h3>Окно «Система Windows защитила ваш компьютер»</h3>
+      <p>Нажмите <b>«Подробнее»</b>, затем появившуюся кнопку <b>«Выполнить в любом случае»</b>.</p>
+      <ol class="steps">
+        <li>Нажмите ссылку <b>«Подробнее»</b> слева, под текстом про неопознанное приложение.</li>
+        <li>Внизу слева появится кнопка <b>«Выполнить в любом случае»</b> &mdash; нажмите её.</li>
+        <li>Если кнопки нет: закройте окно, откройте свойства exe и отметьте <b>«Разблокировать»</b>, затем запустите снова.</li>
+      </ol>
+
+      <h3>Окно «Не удалось найти приложение» / файл не запускается</h3>
+      <ol class="steps">
+        <li>Нажмите <b>Подробнее</b> в окне.</li>
+        <li>Выберите в списке <b>Smartscreen.exe</b> и нажмите <b>Удалить</b>.</li>
+        <li>Повторите запуск лаунчера.</li>
+      </ol>
+
+      <h3>Если файл просто скачался и не открывается</h3>
+      <ol class="steps">
+        <li>Откройте папку с файлом и нажмите правой кнопкой на exe.</li>
+        <li>В свойствах на вкладке «Общие» отметьте <b>Разблокировать</b> и нажмите «ОК».</li>
+        <li>Запустите файл снова.</li>
+      </ol>
+
+      <h3>Как убрать предупреждение навсегда</h3>
+      <p>Предупреждение SmartScreen зависит от репутации файла в Microsoft. Она растёт по мере скачиваний, а также снимается при подписи кода.</p>
+    </section>
+
+    <section class="card" id="versions">
+      <h2>История версий</h2>
+      <p class="sub">Что менялось в последних выпусках. Полный список — в <a href="https://github.com/daniprocrut-ui/craftunity/releases" target="_blank" rel="noopener">релизах на GitHub</a>.</p>
+      <ol class="changelog">
+        <li><b>1.6.3</b><span>Установка модов перетаскиванием файла в лаунчер: .jar — мод, .zip — ресурспак.</span></li>
+        <li><b>1.6.2</b><span>Экран входа до авторизации и профиль после; новый ЛС сразу в списке чатов; копирование ссылки не падает на занятом буфере.</span></li>
+        <li><b>1.6.1</b><span>Новости, объявления, профиль и уведомления; свой заголовок окна; мгновенная смена темы; исправлены счётчики непрочитанных.</span></li>
+        <li><b>1.6.0</b><span>Объявления между игроками, вкладка «Новости», панель уведомлений, полный список предметов, исправлены зависания.</span></li>
+        <li><b>1.5.47</b><span>Список личных собеседников постоянный; демо на сайте с одной страницы объявлений.</span></li>
+      </ol>
+      <div class="older">
+        <p class="older-title">Предыдущие версии</p>
+        <p class="sub">Обычно ставить их не нужно. Берите только если новая версия на вашей системе не запускается — и вернитесь на актуальную, когда починим.</p>
+        <ul class="older-list">
+          <li>
+            <span class="older-ver">1.6.0</span>
+            <span class="older-date">16.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.6.0/Craftunity_Setup_1.6.0.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+          <li>
+            <span class="older-ver">1.5.47</span>
+            <span class="older-date">15.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.47/Craftunity_Setup_1.5.47.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+          <li>
+            <span class="older-ver">1.5.46</span>
+            <span class="older-date">15.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.46/Craftunity_Setup_1.5.46.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+          <li>
+            <span class="older-ver">1.5.45</span>
+            <span class="older-date">15.11.2026</span>
+            <span class="older-size">68 МБ</span>
+            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.45/Craftunity_Setup_1.5.45.exe" target="_blank" rel="noopener">Скачать</a>
+          </li>
+        </ul>
+        <p class="older-warn">Старая версия сама предложит обновиться до актуальной при запуске.</p>
+      </div>
+    </section>
+
+    <section class="card" id="compare">
       <h2>Сравнение</h2>
       <p class="sub">Craftunity против популярных способов играть на своём сервере.</p>
       <div class="cmp-wrap">
@@ -1021,104 +1104,18 @@
       </div>
       <p class="cmp-note">Сравнение по общедоступным возможностям проектов на момент публикации. Craftunity — лаунчер одного сервера: других серверов и своих сборок в нём нет. Функции сторонних лаунчеров могут меняться — сверяйтесь с их сайтами.</p>
     </section>
-<section class="card" id="versions">
-      <h2>История версий</h2>
-      <p class="sub">Что менялось в последних выпусках. Полный список — в <a href="https://github.com/daniprocrut-ui/craftunity/releases" target="_blank" rel="noopener">релизах на GitHub</a>.</p>
-      <ol class="changelog">
-        <li><b>1.6.3</b><span>Установка модов перетаскиванием файла в лаунчер: .jar — мод, .zip — ресурспак.</span></li>
-        <li><b>1.6.2</b><span>Экран входа до авторизации и профиль после; новый ЛС сразу в списке чатов; копирование ссылки не падает на занятом буфере.</span></li>
-        <li><b>1.6.1</b><span>Новости, объявления, профиль и уведомления; свой заголовок окна; мгновенная смена темы; исправлены счётчики непрочитанных.</span></li>
-        <li><b>1.6.0</b><span>Объявления между игроками, вкладка «Новости», панель уведомлений, полный список предметов, исправлены зависания.</span></li>
-        <li><b>1.5.47</b><span>Список личных собеседников постоянный; демо на сайте с одной страницы объявлений.</span></li>
-      </ol>
-      <div class="older">
-        <p class="older-title">Предыдущие версии</p>
-        <p class="sub">Обычно ставить их не нужно. Берите только если новая версия на вашей системе не запускается — и вернитесь на актуальную, когда починим.</p>
-        <ul class="older-list">
-          <li>
-            <span class="older-ver">1.6.0</span>
-            <span class="older-date">16.11.2026</span>
-            <span class="older-size">68 МБ</span>
-            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.6.0/Craftunity_Setup_1.6.0.exe" target="_blank" rel="noopener">Скачать</a>
-          </li>
-          <li>
-            <span class="older-ver">1.5.47</span>
-            <span class="older-date">15.11.2026</span>
-            <span class="older-size">68 МБ</span>
-            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.47/Craftunity_Setup_1.5.47.exe" target="_blank" rel="noopener">Скачать</a>
-          </li>
-          <li>
-            <span class="older-ver">1.5.46</span>
-            <span class="older-date">15.11.2026</span>
-            <span class="older-size">68 МБ</span>
-            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.46/Craftunity_Setup_1.5.46.exe" target="_blank" rel="noopener">Скачать</a>
-          </li>
-          <li>
-            <span class="older-ver">1.5.45</span>
-            <span class="older-date">15.11.2026</span>
-            <span class="older-size">68 МБ</span>
-            <a href="https://github.com/daniprocrut-ui/craftunity/releases/download/v1.5.45/Craftunity_Setup_1.5.45.exe" target="_blank" rel="noopener">Скачать</a>
-          </li>
-        </ul>
-        <p class="older-warn">Старая версия сама предложит обновиться до актуальной при запуске.</p>
-      </div>
+
+    <section class="card" id="requirements">
+      <h2>Требования</h2>
+      <dl class="info">
+        <div><dt>Система</dt><dd>Windows 10 или 11, 64 бита</dd></div>
+        <div><dt>Java</dt><dd>17 или 21, скачивается автоматически</dd></div>
+        <div><dt>Место на диске</dt><dd>около 1,5 ГБ на клиент и моды</dd></div>
+        <div><dt>Интернет</dt><dd>нужен для первой загрузки клиента</dd></div>
+      </dl>
     </section>
-<section class="card" id="help">
-      <h2>Windows не даёт запустить файл?</h2>
-      <p class="sub">SmartScreen предупреждает о файлах без цифровой репутации — это нормально для маленьких проектов. Вот как пройти окно.</p>
 
-      <h3>Окно «Система Windows защитила ваш компьютер»</h3>
-      <p>Нажмите <b>«Подробнее»</b>, затем появившуюся кнопку <b>«Выполнить в любом случае»</b>.</p>
-      <ol class="steps">
-        <li>Нажмите ссылку <b>«Подробнее»</b> слева, под текстом про неопознанное приложение.</li>
-        <li>Внизу слева появится кнопка <b>«Выполнить в любом случае»</b> &mdash; нажмите её.</li>
-        <li>Если кнопки нет: закройте окно, откройте свойства exe и отметьте <b>«Разблокировать»</b>, затем запустите снова.</li>
-      </ol>
-
-      <h3>Окно «Не удалось найти приложение» / файл не запускается</h3>
-      <ol class="steps">
-        <li>Нажмите <b>Подробнее</b> в окне.</li>
-        <li>Выберите в списке <b>Smartscreen.exe</b> и нажмите <b>Удалить</b>.</li>
-        <li>Повторите запуск лаунчера.</li>
-      </ol>
-
-      <h3>Если файл просто скачался и не открывается</h3>
-      <ol class="steps">
-        <li>Откройте папку с файлом и нажмите правой кнопкой на exe.</li>
-        <li>В свойствах на вкладке «Общие» отметьте <b>Разблокировать</b> и нажмите «ОК».</li>
-        <li>Запустите файл снова.</li>
-      </ol>
-
-      <h3>Как убрать предупреждение навсегда</h3>
-      <p>Предупреждение SmartScreen зависит от репутации файла в Microsoft. Она растёт по мере скачиваний, а также снимается при подписи кода.</p>
-    </section>
-    </div>
-
-    <div class="col">
-<section class="card" id="screens">
-      <h2>Как это выглядит</h2>
-      <p class="sub">Реальные экраны лаунчера 1.6.0. Кликните по кадру, чтобы открыть демо в браузере.</p>
-      <div class="shots">
-        <button class="shot" type="button" data-full="shots/play.png">
-          <img src="shots/play.png" alt="Экран «Играть» в лаунчере Craftunity" width="1000" height="627" loading="lazy">
-          <span>Играть</span>
-        </button>
-        <button class="shot" type="button" data-full="shots/mods.png">
-          <img src="shots/mods.png" alt="Каталог модов с установкой в один клик" width="1000" height="627" loading="lazy">
-          <span>Контент</span>
-        </button>
-        <button class="shot" type="button" data-full="shots/chat.png">
-          <img src="shots/chat.png" alt="Чат лаунчера: общий чат, объявления и личные сообщения" width="1000" height="627" loading="lazy">
-          <span>Чат</span>
-        </button>
-        <button class="shot" type="button" data-full="shots/ads.png">
-          <img src="shots/ads.png" alt="Объявления игроков: продаю и куплю" width="1000" height="627" loading="lazy">
-          <span>Объявления</span>
-        </button>
-      </div>
-      <p class="shots-note"><a href="demo/lite.html" class="demo-link">Открыть демо в браузере <span class="demo-arrow" aria-hidden="true">→</span></a></p>
-    </section>
-<section class="card" id="howto">
+    <section class="card" id="howto">
       <h2>Как играть</h2>
       <ol class="steps">
         <li>Скачайте exe и сохраните его в любое место.</li>
@@ -1127,20 +1124,8 @@
         <li>Нажмите кнопку &laquo;Играть&raquo; и ждите загрузки.</li>
       </ol>
     </section>
-<section class="card" id="server">
-      <h2>Сервер</h2>
-      <p class="sub">Адрес для подключения из обычного Minecraft.</p>
-      <div class="server">
-        <code id="server-addr">craftunity3.mcsh.io:25565</code>
-        <button id="copy-btn" class="btn secondary" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4H6.5A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></svg>
-          Скопировать адрес
-        </button>
-      </div>
-      <div id="copy-status" class="copied" aria-live="polite"></div>
-      <p style="color:var(--muted);margin:6px 0 0;font-size:14px">Порт по умолчанию &mdash; 25565, если он не указан.</p>
-    </section>
-<section class="card" id="faq">
+
+    <section class="card" id="faq">
       <h2>Частые вопросы</h2>
       <details>
         <summary>Антивирус или SmartScreen ругается на файл</summary>
@@ -1179,16 +1164,19 @@
         <p>Лог лаунчера — <code>%APPDATA%\Craftunity\launcher.log</code>, журналы игры — в <code>%APPDATA%\Craftunity\game\logs\latest.log</code>. Приложите их к сообщению о проблеме — так починим быстрее.</p>
       </details>
     </section>
-    </div>
 
-<section class="card" id="requirements">
-      <h2>Требования</h2>
-      <dl class="info">
-        <div><dt>Система</dt><dd>Windows 10 или 11, 64 бита</dd></div>
-        <div><dt>Java</dt><dd>17 или 21, скачивается автоматически</dd></div>
-        <div><dt>Место на диске</dt><dd>около 1,5 ГБ на клиент и моды</dd></div>
-        <div><dt>Интернет</dt><dd>нужен для первой загрузки клиента</dd></div>
-      </dl>
+    <section class="card" id="server">
+      <h2>Сервер</h2>
+      <p class="sub">Адрес для подключения из обычного Minecraft.</p>
+      <div class="server">
+        <code id="server-addr">craftunity3.mcsh.io:25565</code>
+        <button id="copy-btn" class="btn secondary" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4H6.5A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></svg>
+          Скопировать адрес
+        </button>
+      </div>
+      <div id="copy-status" class="copied" aria-live="polite"></div>
+      <p style="color:var(--muted);margin:6px 0 0;font-size:14px">Порт по умолчанию &mdash; 25565, если он не указан.</p>
     </section>
     </main>
 
