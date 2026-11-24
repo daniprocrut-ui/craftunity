@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -144,6 +145,8 @@ public partial class MainWindow : Window
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         LoadHiddenPeers();
+        LoadWatched();
+        LoadChatSeen();
         Nav.SelectedIndex = 0;
         var url = await BackendLauncher.EnsureAsync(ResolveApiUrl());
         await ConnectAsync(url);
@@ -172,14 +175,12 @@ public partial class MainWindow : Window
             return;
         }
         if (release is null) return;
-        var answer = MessageBox.Show(
-            this,
-            $"Доступна новая версия лаунчера {release.Version} (у вас {current}).\n\n" +
-            "Скачать и установить сейчас? Лаунчер закроется, установщик запустится сам.",
-            "Обновление Craftunity",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+
+        // Плашка на главной: напоминает об обновлении, не мешая работе.
+        _pendingRelease = release;
+        UpdateBannerText.Text = $"Доступна версия {release.Version} (у вас {current})";
+        UpdateBanner.Visibility = Visibility.Visible;
+        return;
         string? installer = null;
         try
         {
@@ -442,6 +443,21 @@ public partial class MainWindow : Window
             if (string.IsNullOrWhiteSpace(ElyLogin.Text)) ElyLogin.Text = overview.Account.Username;
         }
 
+        SyncAccountPanels();
+        if (overview.Account is not null && !_profileLoading)
+        {
+            var logged = overview.Account.Username;
+            if (!string.Equals(_profileShown, logged, StringComparison.OrdinalIgnoreCase))
+            {
+                _profileShown = logged;
+                _ = ShowProfileAsync(logged);
+            }
+        }
+        else if (overview.Account is null)
+        {
+            _profileShown = "";
+        }
+
         HeroChips.Children.Clear();
         void Chip(string caption, string value)
         {
@@ -613,6 +629,93 @@ public partial class MainWindow : Window
         timer.Start();
     }
 
+    // ------------------------------------------------------------ Кнопки окна
+
+    private void OnMinimizeClick(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void OnMaximizeClick(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+        SyncMaximizeGlyph();
+    }
+
+    private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>Иконка кнопки меняется на «восстановить», когда окно развёрнуто.</summary>
+    private void SyncMaximizeGlyph()
+    {
+        if (MaximizeGlyph is null) return;
+        MaximizeGlyph.Text = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+    }
+
+    /// <summary>Правый клик по «Развернуть» открывает меню положения окна.</summary>
+    private void OnMaximizeRightClick(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (WindowPlaceMenu is null) return;
+        WindowPlaceMenu.PlacementTarget = MaximizeButton;
+        WindowPlaceMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        WindowPlaceMenu.IsOpen = true;
+    }
+
+    /// <summary>Двигает окно к краю экрана или в центр, размер не меняет.</summary>
+    private void OnSnapClick(object sender, RoutedEventArgs e)
+    {
+        var where = sender switch
+        {
+            MenuItem { Tag: string m } => m,
+            Border { Tag: string b } => b,
+            _ => "",
+        };
+        if (where.Length == 0) return;
+        WindowPlaceMenu.IsOpen = false;
+
+        if (where == "maximize")
+        {
+            WindowState = WindowState.Maximized;
+            SyncMaximizeGlyph();
+            return;
+        }
+
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+
+        var area = SystemParameters.WorkArea;
+        var width = ActualWidth > 0 ? ActualWidth : Width;
+        var height = ActualHeight > 0 ? ActualHeight : Height;
+
+        double left, top;
+        switch (where)
+        {
+            case "left":
+                left = area.Left;
+                top = area.Top + (area.Height - height) / 2;
+                break;
+            case "right":
+                left = area.Right - width;
+                top = area.Top + (area.Height - height) / 2;
+                break;
+            case "top":
+                left = area.Left + (area.Width - width) / 2;
+                top = area.Top;
+                break;
+            case "bottom":
+                left = area.Left + (area.Width - width) / 2;
+                top = area.Bottom - height;
+                break;
+            default:
+                left = area.Left + (area.Width - width) / 2;
+                top = area.Top + (area.Height - height) / 2;
+                break;
+        }
+
+        Left = left;
+        Top = top;
+        SyncMaximizeGlyph();
+    }
+
     private void OnNavChanged(object sender, SelectionChangedEventArgs e)
     {
         if (PagePlay is null) return;
@@ -695,6 +798,7 @@ public partial class MainWindow : Window
                 _ = LoadNewsAsync();
                 break;
             case 6:
+                MarkChatSeen();
                 ClearChatUnread();
                 _ = RefreshClientIconsAsync(true);
                 _ = LoadChatAsync(true);
@@ -1532,6 +1636,7 @@ public partial class MainWindow : Window
     {
         ShowAdSuggest(AdPriceSuggest, AdPriceBox);
         UpdateAdIconSoon();
+        UpdateAdPriceHint();
     }
 
     private void UpdateAdIcons()
@@ -1604,7 +1709,89 @@ public partial class MainWindow : Window
         AdComposerCard.Visibility = Visibility.Collapsed;
     }
 
+    /// <summary>Проверка «Мои сделки»: показываются только свои объявления.</summary>
+    private bool _adsMineOnly;
+
+    private async void OnAdsMineOnlyClick(object sender, RoutedEventArgs e)
+    {
+        _adsMineOnly = AdsMineOnly.IsChecked == true;
+        await LoadAdsAsync();
+    }
+
     private async void OnAdsRefreshClick(object sender, RoutedEventArgs e) => await LoadAdsAsync();
+
+    /// <summary>Средняя цена за штуку по открытым объявлениям: предмет → цена оплаты → средняя.</summary>
+    private readonly Dictionary<(string Item, string Price), double> _marketUnit =
+        new(new MarketKeyComparer());
+
+    private sealed class MarketKeyComparer : IEqualityComparer<(string Item, string Price)>
+    {
+        public bool Equals((string Item, string Price) x, (string Item, string Price) y) =>
+            string.Equals(x.Item, y.Item, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(x.Price, y.Price, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string Item, string Price) obj) =>
+            HashCode.Combine(obj.Item.ToLowerInvariant(), obj.Price.ToLowerInvariant());
+    }
+
+    /// <summary>Пересчитывает средние цены рынка и проставляет подсказки конкретным объявлениям.</summary>
+    private void RebuildMarket()
+    {
+        _marketUnit.Clear();
+        var sums = new Dictionary<(string Item, string Price), (double Value, int Count)>(new MarketKeyComparer());
+        foreach (var ad in _ads)
+        {
+            if (ad.Status == "closed" || ad.ItemCount <= 0) continue;
+            var key = (ad.Item, ad.PriceItem);
+            var unit = (double)ad.PriceCount / ad.ItemCount;
+            if (unit <= 0) continue;
+            sums[key] = sums.TryGetValue(key, out var acc)
+                ? (acc.Value + unit, acc.Count + 1)
+                : (unit, 1);
+        }
+        foreach (var pair in sums)
+        {
+            _marketUnit[pair.Key] = pair.Value.Value / pair.Value.Count;
+        }
+
+        foreach (var ad in _ads)
+        {
+            ad.MarketHint = "";
+            if (ad.Status == "closed" || ad.ItemCount <= 0) continue;
+            if (!_marketUnit.TryGetValue((ad.Item, ad.PriceItem), out var average) || average <= 0) continue;
+            var unit = (double)ad.PriceCount / ad.ItemCount;
+            if (unit <= 0) continue;
+            var delta = (unit - average) / average * 100;
+            string verdict;
+            if (Math.Abs(delta) < 5) verdict = "в среднем по рынку";
+            else if (delta < 0) verdict = $"дешевле рынка на {Math.Abs(Math.Round(delta)):0}%";
+            else verdict = $"дороже рынка на {Math.Round(delta):0}%";
+            ad.MarketHint = $"Рынок: ~{average:0.##} за шт. · это {verdict}";
+
+        }
+    }
+
+    /// <summary>Подсказка в форме: куда ставить цену по текущему рынку.</summary>
+    private void UpdateAdPriceHint()
+    {
+        var item = FindAdItem(AdItemBox.Text);
+        var price = FindAdItem(AdPriceBox.Text);
+        if (item is null || price is null)
+        {
+            AdPriceHint.Text = "";
+            return;
+        }
+        var unit = _marketUnit.TryGetValue((item.Value.Name, price.Value.Name), out var avg) ? avg : 0;
+        if (unit <= 0)
+        {
+            AdPriceHint.Text = "Рынок: цен пока нет";
+            return;
+        }
+        var itemCount = int.TryParse(AdItemCountBox.Text.Trim(), out var ic) ? Math.Max(ic, 1) : 1;
+        var suggested = Math.Max(1, (int)Math.Round(unit * itemCount));
+        AdPriceHint.Text = $"Рынок ~{unit:0.##} за шт. · для {itemCount} шт. это ~{suggested} {price.Value.Name}";
+
+    }
 
     /// <summary>Загружает объявления с сервера и раскладывает: открытые сверху, закрытые внизу.</summary>
     private async Task LoadAdsAsync()
@@ -1661,9 +1848,16 @@ public partial class MainWindow : Window
             _ads.Clear();
             foreach (var ad in ordered) _ads.Add(ad);
 
-            AdsList.ItemsSource = _ads;
+            RebuildMarket();
+            foreach (var ad in _ads) ad.IsWatched = _watched.ContainsKey(ad.Id);
+            SyncWatched();
+            var visible = _ads.Where(a => !_adsMineOnly || a.IsMine).ToList();
+            AdsList.ItemsSource = visible;
             var openAds = _ads.Count(a => a.Status != "closed");
-            AdsState.Text = $"Открытых объявлений: {openAds} · закрытых: {_ads.Count - openAds}";
+            var mineDeals = _ads.Count(a => a.IsMine && a.Status == "closed");
+            AdsState.Text = _adsMineOnly
+                ? $"Мои сделки: закрыто {mineDeals} · моих объявлений {_ads.Count(a => a.IsMine)}"
+                : $"Открытых объявлений: {openAds} · закрытых: {_ads.Count - openAds}";
 
             foreach (var ad in _ads)
             {
@@ -1780,6 +1974,142 @@ public partial class MainWindow : Window
         return true;
     }
 
+    /// <summary>Слежение за чужими объявлениями: id → последняя известная цена.</summary>
+    private readonly Dictionary<long, string> _watched = new();
+
+    private static string ChatSeenPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Craftunity", "chat-seen.json");
+
+    /// <summary>Последний id, который пользователь реально видел. Переживает перезапуск.</summary>
+    private void LoadChatSeen()
+    {
+        try
+        {
+            if (!File.Exists(ChatSeenPath)) return;
+            var map = JsonSerializer.Deserialize<Dictionary<string, long>>(File.ReadAllText(ChatSeenPath));
+            if (map is null) return;
+            foreach (var pair in map) _chatSeen[pair.Key] = pair.Value;
+            if (_chatSeen.TryGetValue(_chatChannel, out var last))
+            {
+                _chatSeenHigh = last;
+                if (last > _chatLastId) _chatLastId = last;
+            }
+        }
+        catch
+        {
+            // повреждённый файл не должен мешать запуску
+        }
+    }
+
+    private void SaveChatSeen()
+    {
+        try
+        {
+            if (_chatLastId > 0) _chatSeen[_chatChannel] = _chatLastId;
+            Directory.CreateDirectory(Path.GetDirectoryName(ChatSeenPath)!);
+            File.WriteAllText(ChatSeenPath, JsonSerializer.Serialize(_chatSeen));
+        }
+        catch
+        {
+            // отметка не критична
+        }
+    }
+
+    private readonly Dictionary<string, long> _chatSeen = new();
+
+    /// <summary>Самый большой id, который пользователь уже видел в этом канале.</summary>
+    private long _chatSeenHigh;
+
+    private static string WachedPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Craftunity", "watched-ads.json");
+
+    private void LoadWatched()
+    {
+        _watched.Clear();
+        try
+        {
+            if (!File.Exists(WachedPath)) return;
+            var map = JsonSerializer.Deserialize<Dictionary<long, string>>(File.ReadAllText(WachedPath));
+            foreach (var pair in map ?? new Dictionary<long, string>()) _watched[pair.Key] = pair.Value;
+        }
+        catch
+        {
+            // повреждённый файл не должен мешать запуску
+        }
+    }
+
+    private void SaveWatched()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(WachedPath)!);
+            File.WriteAllText(WachedPath, JsonSerializer.Serialize(_watched));
+        }
+        catch
+        {
+            // список можно восстановить вручную
+        }
+    }
+
+    private static string WatchSignature(AdItem ad) =>
+        ad.Status == "closed" ? "closed" : $"{ad.ItemCount}x{ad.Item} за {ad.PriceCount} {ad.PriceItem}";
+
+    /// <summary>Сообщает в колокольчик, если у отслеживаемого объявления изменилась цена или оно закрыто.</summary>
+    private void SyncWatched()
+    {
+        if (_watched.Count == 0) return;
+        var changed = new List<BellNote>();
+        foreach (var ad in _ads)
+        {
+            if (!_watched.TryGetValue(ad.Id, out var was)) continue;
+            var now = WatchSignature(ad);
+            if (was == now) continue;
+            _watched[ad.Id] = now;
+            var title = ad.Status == "closed"
+                ? $"«{ad.Item}» закрыто"
+                : $"Цена изменилась: «{ad.Item}»";
+            var body = ad.Status == "closed"
+                ? $"Автор {ad.Username} закрыл объявление (договорился с {ad.ClosedWith})."
+                : $"{ad.ItemCount} × {ad.Item} за {ad.PriceCount} {ad.PriceItem}.";
+            changed.Add(new BellNote
+            {
+                Kind = "ad",
+                Title = title,
+                Body = body,
+                TimeLabel = DateTime.Now.ToString("HH:mm"),
+            });
+        }
+        if (changed.Count == 0) return;
+        foreach (var note in changed) PushBell(note);
+        SaveWatched();
+    }
+
+    private void OnAdWatchClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: AdItem ad }) return;
+        if (_watched.ContainsKey(ad.Id))
+        {
+            _watched.Remove(ad.Id);
+            ad.IsWatched = false;
+            SaveWatched();
+            Toast("Больше не следим за объявлением");
+        }
+        else
+        {
+            _watched[ad.Id] = WatchSignature(ad);
+            ad.IsWatched = true;
+            SaveWatched();
+            Toast("Следим: сообщим, если цена изменится или объявление закроют");
+        }
+        // Пересобираем список, чтобы подпись кнопки обновилась.
+        var ordered = _ads.ToList();
+        _ads.Clear();
+        foreach (var item in ordered) _ads.Add(item);
+        AdsList.ItemsSource = _ads.Where(a => !_adsMineOnly || a.IsMine).ToList();
+    }
+
     private AdOffer? _notifyOffer;
     private readonly HashSet<string> _adsSeen = new(StringComparer.OrdinalIgnoreCase);
     private bool _adsSeeded;
@@ -1858,6 +2188,47 @@ public partial class MainWindow : Window
         });
     }
 
+    private LauncherUpdate.Release? _pendingRelease;
+
+    /// <summary>Кнопка на плашке: спрашивает подтверждение и ставит обновление.</summary>
+    private async void OnUpdateBannerClick(object sender, RoutedEventArgs e)
+    {
+        var release = _pendingRelease;
+        if (release is null) return;
+        var answer = MessageBox.Show(
+            this,
+            $"Скачать и установить версию {release.Version}? Лаунчер закроется, установщик запустится сам.",
+            "Обновление Craftunity",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+        string? installer = null;
+        try
+        {
+            StatusText.Text = "Скачивание обновления:";
+            installer = await LauncherUpdate.DownloadAsync(release, p =>
+                Dispatcher.InvokeAsync(() => StatusText.Text = $"Скачивание обновления: {p:P0}"));
+        }
+        catch
+        {
+            installer = null;
+        }
+        if (installer is null)
+        {
+            StatusText.Text = "";
+            MessageBox.Show(this,
+                "Не удалось скачать обновление. Попробуйте ещё раз позже или скачайте установщик с сайта.",
+                "Обновление Craftunity", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        StatusText.Text = "Запуск установщика:";
+        if (LauncherUpdate.RunInstallerAfterExit(installer))
+        {
+            _pollCts?.Cancel();
+            Close();
+        }
+    }
+
     private void ShowAdNotification(AdOffer offer, AdItem ad)
     {
         _notifyOffer = offer;
@@ -1902,6 +2273,287 @@ public partial class MainWindow : Window
     }
 
     /// <summary>После одобрения предложения открывает личные с тем, чьё предложение приняли.</summary>
+    // ------------------------------------------------------------------ профиль игрока
+
+    private string _profileName = "";
+
+    /// <summary>Собирает профиль по тем же данным, что видят все лаунчеры: /ads и /clients.</summary>
+    private async Task<PlayerProfile?> BuildProfileAsync(string username, string instanceId)
+    {
+        var name = (username ?? "").Trim();
+        if (name.Length == 0) return null;
+
+        var profile = new PlayerProfile { Username = name, InstanceId = instanceId };
+        var currencyHint = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            using var response = await ChatHttp.GetAsync(ChatBaseUrl + "/ads");
+            if (response.IsSuccessStatusCode)
+            {
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                foreach (var item in doc.RootElement.Arr("ads"))
+                {
+                    var author = item.Str("username").Trim();
+                    var adInstance = item.Str("instance_id");
+                    var isMine = string.Equals(author, name, StringComparison.OrdinalIgnoreCase);
+                    var status = item.Str("status", "open");
+                    if (string.IsNullOrEmpty(profile.InstanceId) && isMine) profile.InstanceId = adInstance;
+
+                    var side = item.Str("side", "sell");
+                    var adItem = item.Str("item");
+                    var adCount = (int)item.Num("item_count");
+                    var priceItem = item.Str("price_item");
+                    var priceCount = (int)item.Num("price_count");
+
+                    if (isMine && status == "open") profile.OpenAds++;
+                    if (isMine && status == "closed")
+                    {
+                        if (side == "sell") profile.SoldDeals++;
+                        else profile.BoughtDeals++;
+                        profile.DealLines.Add(
+                            $"{(side == "sell" ? "Продал" : "Купил")}: {adCount} x {adItem} за {priceCount} {priceItem} - с {item.Str("closed_with")}");
+                    }
+
+                    foreach (var offer in item.Arr("offers"))
+                    {
+                        var offerUser = offer.Str("username").Trim();
+                        var state = offer.Str("state", "pending");
+                        if (isMine)
+                        {
+                            if (state == "pending") profile.PendingOffers++;
+                            else if (state == "accepted") profile.AcceptedOffers++;
+                            else if (state == "declined") profile.DeclinedOffers++;
+                        }
+                        else if (string.Equals(offerUser, name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (state == "pending") profile.PendingOffers++;
+                            else if (state == "accepted") profile.AcceptedOffers++;
+                            else if (state == "declined") profile.DeclinedOffers++;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // профиль не критичен для работы лаунчера
+        }
+
+        try
+        {
+            using var response = await ChatHttp.GetAsync($"{ChatBaseUrl}/clients?light=1&token={ClientsToken}");
+            if (response.IsSuccessStatusCode)
+            {
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                if (doc.RootElement.TryGetProperty("clients", out var clients)
+                    && clients.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var client in clients.EnumerateArray())
+                    {
+                        if (!string.Equals(client.Str("username").Trim(), name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+                        if (string.IsNullOrEmpty(profile.InstanceId))
+                        {
+                            profile.InstanceId = client.Str("instance_id");
+                        }
+                        var lastSeen = client.Num("last_seen");
+                        var startedAt = client.Num("started_at");
+                        if (lastSeen > 0)
+                        {
+                            var seen = DateTimeOffset.FromUnixTimeSeconds((long)lastSeen).ToLocalTime();
+                            profile.LastSeenText = "был(а) в сети " + seen.ToString("dd.MM HH:mm");
+                        }
+                        if (lastSeen > 0 && startedAt > 0 && lastSeen >= startedAt)
+                        {
+                            var span = TimeSpan.FromSeconds(lastSeen - startedAt);
+                            profile.PlaytimeText = "сессия " + FormatPlaytime(span);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // реестр необязателен
+        }
+
+        profile.DealLines.Reverse();
+        while (profile.DealLines.Count > 5) profile.DealLines.RemoveAt(profile.DealLines.Count - 1);
+        return profile;
+    }
+
+    /// <summary>До входа показываем карточки входа, после — профиль с кнопкой «Выйти».</summary>
+    private string _profileShown = "";
+    private bool _profileLoading;
+
+    private void SyncAccountPanels()
+    {
+        if (LoginPanel is null || ProfilePanel is null) return;
+        var loggedIn = _overview?.Account is not null;
+        LoginPanel.Visibility = loggedIn ? Visibility.Collapsed : Visibility.Visible;
+        ProfilePanel.Visibility = loggedIn ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async Task ShowProfileAsync(string username, string instanceId = "")
+    {
+        var name = (username ?? "").Trim();
+        if (name.Length == 0) name = _overview?.Account?.Username ?? "";
+        if (name.Length == 0)
+        {
+            ProfileName.Text = "Аккаунт не выбран";
+            ProfileType.Text = "Войдите через ely.by или выберите оффлайн-ник";
+            SyncAccountPanels();
+            return;
+        }
+
+        _profileLoading = true;
+        try
+        {
+        var profile = await BuildProfileAsync(name, instanceId);
+        if (profile is null) return;
+        _profileName = profile.Username;
+        _lastProfile = profile;
+
+        ProfileName.Text = profile.Username;
+        ProfileType.Text = string.Equals(name, _overview?.Account?.Username ?? "", StringComparison.OrdinalIgnoreCase)
+            ? (_overview?.Account?.Type == "ely" ? "Аккаунт ely.by" : "Оффлайн-аккаунт")
+            : "Игрок Craftunity";
+
+        ProfileOpenAds.Text = profile.OpenAds.ToString();
+        ProfileSold.Text = profile.SoldDeals.ToString();
+        ProfileBought.Text = profile.BoughtDeals.ToString();
+        ProfilePending.Text = profile.PendingOffers.ToString();
+
+        ProfileRating.Text = profile.AcceptedOffers + profile.DeclinedOffers == 0
+            ? "нет сделок"
+            : profile.Rating + "%";
+        ProfilePlaytime.Text = string.IsNullOrWhiteSpace(profile.PlaytimeText)
+            ? "время не учтено"
+            : profile.PlaytimeText;
+
+        ProfileDeals.ItemsSource = profile.DealLines;
+        ProfileEmpty.Visibility = profile.DealLines.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ProfileLink.Text = profile.ShareLink;
+
+        ProfileAvatar.Source = await LoadProfileAvatarAsync(profile.Username);
+        }
+        finally
+        {
+            _profileLoading = false;
+        }
+    }
+
+    /// <summary>Голова игрока: скин из реестра клиентов, иначе по нику через ely.by.</summary>
+    private async Task<System.Windows.Media.ImageSource?> LoadProfileAvatarAsync(string name)
+    {
+        try
+        {
+            if (IsOwnAuthor(name) && _heroAvatar is not null) return _heroAvatar;
+            var iconUrl = IconFromRegistry(name);
+            if (!string.IsNullOrEmpty(iconUrl))
+            {
+                var fromRegistry = await LoadImageAsync(iconUrl);
+                var head = fromRegistry is BitmapSource skin ? CropHead(skin) ?? skin : null;
+                if (head is not null) return head;
+            }
+            var fallback = await SkinForAsync(name, "https://skinsystem.ely.by/skins/" + Uri.EscapeDataString(name));
+            return fallback;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Асинхронный вариант SkinFor: не блокирует UI-поток.</summary>
+    private static async Task<System.Windows.Media.ImageSource?> SkinForAsync(string key, string skinUrl)
+    {
+        var cacheKey = "reg:" + key;
+        lock (SkinCache)
+        {
+            if (SkinCache.TryGetValue(cacheKey, out var cached)) return cached;
+        }
+        var image = await LoadImageAsync(skinUrl);
+        BitmapSource? head = image is BitmapSource source ? CropHead(source) ?? source : null;
+        lock (SkinCache) SkinCache[cacheKey] = head;
+        return head;
+    }
+
+    private PlayerProfile? _lastProfile;
+
+    private static string FormatPlaytime(TimeSpan span)
+    {
+        if (span.TotalMinutes < 1) return "меньше минуты";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes} мин";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours} ч {span.Minutes} мин";
+        return $"{(int)span.TotalDays} д {span.Hours} ч";
+    }
+
+    /// <summary>
+    /// Копирует текст в буфер обмена. Windows может держать буфер занятым чужим процессом
+    /// (CLIPBRD_E_CANT_OPEN), поэтому пробуем несколько раз с короткой паузой.
+    /// </summary>
+    private static bool TryCopyText(string text, int attempts = 5, int delayMs = 60)
+    {
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            try
+            {
+                Clipboard.SetText(text);
+                return true;
+            }
+            catch (System.Runtime.InteropServices.COMException)
+            {
+                if (attempt == attempts - 1) return false;
+                Thread.Sleep(delayMs);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private void OnProfileShareClick(object sender, RoutedEventArgs e)
+    {
+        var name = _lastProfile?.Username;
+        if (string.IsNullOrWhiteSpace(name)) name = _overview?.Account?.Username ?? "";
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            Toast("Сначала выберите аккаунт", true);
+            return;
+        }
+        var link = "craftunity://profile/" + Uri.EscapeDataString(name);
+        if (TryCopyText(link))
+        {
+            Toast("Ссылка на профиль скопирована");
+        }
+        else
+        {
+            Toast("Буфер обмена занят другой программой. Попробуйте ещё раз.", true);
+        }
+    }
+
+    /// <summary>Открывает профиль из ссылки craftunity://profile/ник.</summary>
+    /// <summary>Вызов из App при запуске с ссылкой craftunity://profile/ник.</summary>
+    public void OpenProfileLinkFromArgs(string arg) => _ = OpenProfileLinkAsync(arg);
+
+    private async Task OpenProfileLinkAsync(string arg)
+    {
+        const string marker = "craftunity://profile/";
+        var index = arg.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0) return;
+        var name = Uri.UnescapeDataString(arg[(index + marker.Length)..]).Trim().TrimEnd('/');
+        if (name.Length == 0) return;
+        if (Nav.SelectedIndex != 5) Nav.SelectedIndex = 5;
+        await ShowProfileAsync(name);
+    }
+
     private void OpenAdOfferChat(AdOffer offer)
     {
         try
@@ -1946,7 +2598,7 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ чат
 
-    private const string ChatBaseUrl = "https://craftunity-heartbeat.daniprocrut-ui.workers.dev";
+    private const string ChatBaseUrl = "https://craftunity-heartbeat.netlify.app";
     private const string ClientsToken = "fc0cd5aa8afe801c8a2bd3dbe9ee3796";
 
     /// <summary>Адрес ленты с учётом выбранного чата.</summary>
@@ -2143,7 +2795,7 @@ public partial class MainWindow : Window
         var mine = _overview?.InstanceId ?? "";
         if (string.IsNullOrEmpty(id) || id == mine)
         {
-            // Локальной записи нет — ищем по нику в реестре клиентов.
+            // Локальной записи нет - ищем по нику в реестре клиентов.
             var hit = _clientPeers.FirstOrDefault(p =>
                 string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
             if (hit is null && !openOffline)
@@ -2155,28 +2807,29 @@ public partial class MainWindow : Window
         }
         if (string.IsNullOrEmpty(id))
         {
-            // Собеседник офлайн и его id неизвестен — открываем по нику.
+            // Собеседник офлайн и его id неизвестен - открываем по нику.
             id = "name:" + (name ?? "").Trim().ToLowerInvariant();
         }
         _chatChannel = "dm";
         _chatPeerId = id;
         _chatPeerName = name ?? "";
         ChatRooms.SelectedItem = null;
-        // Открыли чат вручную — значит, он снова нужен в списке.
-        if (_hiddenPeers.Remove(id))
-        {
-            SaveHiddenPeers();
-            FillChatPeers();
-        }
-        var peer = _clientPeers.FirstOrDefault(p => p.Id == id);
-        if (peer is not null)
-        {
-            ChatPeers.SelectedItem = peer;
-        }
-        else
-        {
-            ChatPeers.SelectedItem = null;
-        }
+
+        // Открыли чат вручную — он снова нужен в списке.
+        if (_hiddenPeers.Remove(id)) SaveHiddenPeers();
+
+        // Собеседника из реестра может не быть (он офлайн): запоминаем его,
+        // чтобы FillChatPeers добавил диалог в список личных.
+        if (!string.IsNullOrEmpty(name)) _chatHistoryPeers[id] = name;
+
+        // Список перестраиваем всегда: иначе новый собеседник не появляется
+        // при первом открытии ЛС, если чат не был скрыт.
+        FillChatPeers();
+
+        ChatPeers.SelectedItem = ChatPeers.Items
+            .OfType<ClientEntry>()
+            .FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
+
         ApplyChatChannel();
         _ = LoadChatAsync(true);
     }
@@ -2433,6 +3086,18 @@ public partial class MainWindow : Window
                 ClientPresence.Clear();
                 foreach (var pair in states) ClientPresence[pair.Key] = pair.Value;
             }
+            // Счётчик: только те, у кого запущена игра и кто на связи.
+            var inGame = 0;
+            foreach (var presence in states.Values)
+            {
+                if (presence == PresenceState.InGame) inGame++;
+            }
+            var inGameText = inGame.ToString();
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (OnlinePillText is not null) OnlinePillText.Text = inGameText;
+            });
+
             _clientPeers = peers;
             _clientIconsAt = DateTime.UtcNow;
             await Dispatcher.InvokeAsync(FillChatPeers);
@@ -2459,6 +3124,77 @@ public partial class MainWindow : Window
     private async void OnChatSendClick(object sender, RoutedEventArgs e) => await SendChatAsync();
 
     /// <summary>Ctrl+V работает при любом фокусе, не только в поле ввода.</summary>
+    /// <summary>F5 — обновить текущий экран, Ctrl+Enter — запустить игру, Esc — закрыть оверлеи.</summary>
+    private async void OnGlobalKeyDown(object sender, KeyEventArgs e)
+    {
+        // Esc: сначала закрываем слои, потом уже что-то другое.
+        if (e.Key == Key.Escape)
+        {
+            if (PhotoViewer.Visibility == Visibility.Visible)
+            {
+                OnPhotoViewerClose(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+            if (ProjectOverlay.Visibility == Visibility.Visible)
+            {
+                ProjectOverlay.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+                return;
+            }
+            if (BellPanel.Visibility == Visibility.Visible)
+            {
+                BellPanel.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+                return;
+            }
+            return;
+        }
+
+        if (e.Key == Key.F5)
+        {
+            e.Handled = true;
+            await RefreshCurrentPageAsync();
+            return;
+        }
+
+        if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            e.Handled = true;
+            OnPlayClick(this, new RoutedEventArgs());
+        }
+    }
+
+    /// <summary>Обновляет данные того экрана, который сейчас открыт.</summary>
+    private async Task RefreshCurrentPageAsync()
+    {
+        switch (Nav.SelectedIndex)
+        {
+            case 1:
+                await SearchAsync(false);
+                break;
+            case 2:
+                await ReloadInstalledAsync();
+                break;
+            case 3:
+                await LoadFilesAsync();
+                break;
+            case 6:
+                await LoadChatAsync(true);
+                break;
+            case 7:
+                await LoadAdsAsync();
+                break;
+            case 8:
+                await LoadNewsAsync();
+                break;
+            default:
+                await RefreshAsync();
+                break;
+        }
+        Toast("Обновлено");
+    }
+
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.V || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
@@ -3138,6 +3874,7 @@ public partial class MainWindow : Window
 
     private readonly ObservableCollection<BellNote> _bell = new();
     private bool _bellSeeded;
+    private int _bellUnread;
 
     /// <summary>Счётчик на колокольчике: новые сообщения и новые предложения вместе.</summary>
     private void PushBell(BellNote note)
@@ -3146,9 +3883,28 @@ public partial class MainWindow : Window
         while (_bell.Count > 40) _bell.RemoveAt(_bell.Count - 1);
         BellList.ItemsSource = _bell;
         BellEmpty.Visibility = Visibility.Collapsed;
-        var count = _bell.Count;
-        BellBadgeText.Text = count > 99 ? "99+" : count.ToString();
+        _bellUnread = _bell.Count(n => !n.Seen);
+        RefreshBellBadge();
+    }
+
+    /// <summary>Значок показывает только непрочитанные, а не все записи списка.</summary>
+    private void RefreshBellBadge()
+    {
+        if (_bellUnread <= 0)
+        {
+            BellBadge.Visibility = Visibility.Collapsed;
+            return;
+        }
+        BellBadgeText.Text = _bellUnread > 99 ? "99+" : _bellUnread.ToString();
         BellBadge.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Всё, что в панели, считается прочитанным.</summary>
+    private void MarkBellSeen()
+    {
+        foreach (var note in _bell) note.Seen = true;
+        _bellUnread = 0;
+        RefreshBellBadge();
     }
 
     private void OnBellClick(object sender, RoutedEventArgs e)
@@ -3158,8 +3914,7 @@ public partial class MainWindow : Window
             : Visibility.Visible;
         if (BellPanel.Visibility == Visibility.Visible)
         {
-            // Открыли панель — счётчик обнуляется, записи остаются.
-            BellBadge.Visibility = Visibility.Collapsed;
+            MarkBellSeen();
         }
     }
 
@@ -3168,7 +3923,8 @@ public partial class MainWindow : Window
         _bell.Clear();
         BellList.ItemsSource = _bell;
         BellEmpty.Visibility = Visibility.Visible;
-        BellBadge.Visibility = Visibility.Collapsed;
+        _bellUnread = 0;
+        RefreshBellBadge();
         BellPanel.Visibility = Visibility.Collapsed;
     }
 
@@ -3185,11 +3941,51 @@ public partial class MainWindow : Window
         OpenDirectChat(note.PeerId, note.PeerName, true);
     }
 
+    /// <summary>Непрочитанные по собеседникам: id или name:ник -> счётчик.</summary>
+    private readonly Dictionary<string, int> _peerUnread = new(StringComparer.OrdinalIgnoreCase);
+
+    private void BumpPeerUnread(ChatMessage message)
+    {
+        var key = !string.IsNullOrEmpty(message.InstanceId)
+            ? message.InstanceId
+            : "name:" + (message.Author ?? "").ToLowerInvariant();
+        var inThisChat = _chatChannel == "dm" && IsActive
+                          && (string.Equals(_chatPeerId, key, StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(_chatPeerName, message.Author, StringComparison.OrdinalIgnoreCase));
+        if (inThisChat) return;
+        _peerUnread[key] = _peerUnread.TryGetValue(key, out var was) ? was + 1 : 1;
+        ApplyPeerUnread();
+    }
+
+    /// <summary>Разносит счётчики по элементам списка собеседников.</summary>
+    private void ApplyPeerUnread()
+    {
+        foreach (var item in ChatPeers.Items)
+        {
+            if (item is not ClientEntry entry) continue;
+            var count = _peerUnread.TryGetValue(entry.Id, out var byId) ? byId : 0;
+            if (count == 0 && _peerUnread.TryGetValue("name:" + entry.Name.ToLowerInvariant(), out var byName)) count = byName;
+            entry.UnreadCount = count;
+        }
+    }
+
+    /// <summary>Открыли диалог — счётчик этого собеседника обнуляется.</summary>
+    private void ClearPeerUnread(string? id, string? name)
+    {
+        var changed = false;
+        if (!string.IsNullOrEmpty(id) && _peerUnread.Remove(id)) changed = true;
+        if (!string.IsNullOrEmpty(name) && _peerUnread.Remove("name:" + name.ToLowerInvariant())) changed = true;
+        if (changed) ApplyPeerUnread();
+    }
+
     private void TrackUnread(ChatMessage message)
     {
         if (message.Mine) return;
+        // Старое сообщение (до последнего прочитанного) новым не считается.
+        if (message.Id > 0 && message.Id <= _chatSeenHigh) return;
         if (Nav.SelectedIndex == 6 && IsActive) return;
         _chatUnread++;
+        BumpPeerUnread(message);
         ChatBadgeText.Text = _chatUnread > 99 ? "99+" : _chatUnread.ToString();
         ChatBadge.Visibility = Visibility.Visible;
         PushBell(new BellNote
@@ -3250,6 +4046,13 @@ public partial class MainWindow : Window
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         return buffer.ToArray();
+    }
+
+    /// <summary>Чат открыт — всё, что в нём есть, считается прочитанным и запоминается.</summary>
+    private void MarkChatSeen()
+    {
+        if (_chatLastId > _chatSeenHigh) _chatSeenHigh = _chatLastId;
+        SaveChatSeen();
     }
 
     private void ClearChatUnread()
@@ -3391,7 +4194,15 @@ public partial class MainWindow : Window
                 _chatLastId = id;
                 var senderId = item.Str("instance_id");
                 if (!string.IsNullOrEmpty(senderId) && senderId == mine) continue;
-                if (chatOpen) continue;
+                if (chatOpen)
+                {
+                    if (id > _chatSeenHigh)
+                    {
+                        _chatSeenHigh = id;
+                        SaveChatSeen();
+                    }
+                    continue;
+                }
                 await Dispatcher.InvokeAsync(() =>
                 {
                     var incoming = new ChatMessage
@@ -3461,7 +4272,7 @@ public partial class MainWindow : Window
                 LoadMessageImage(newMessage);
                 RenderReactionsIntoList(newMessage);
                 if (id > _chatLastId) _chatLastId = id;
-                if (!reset) TrackUnread(newMessage);
+                if (!reset && id > _chatSeenHigh) TrackUnread(newMessage);
             }
             var count = (long)root.Num("count");
             ChatState.Text = count == 0 ? "Сообщений пока нет" : $"Сообщений: {count}";
@@ -3555,19 +4366,150 @@ public partial class MainWindow : Window
     {
         var show = LogBox.Visibility != Visibility.Visible;
         LogBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) _ = ShowCrashDiagnosticsAsync();
+    }
+
+    /// <summary>
+    /// Разбирает latest.log и crash-reports: вытаскивает причину падения
+    /// понятным текстом, а не сырым стектрейсом.
+    /// </summary>
+    private async Task ShowCrashDiagnosticsAsync()
+    {
+        var logs = Path.Combine(_overview?.GameDir ?? "", "logs");
+        var crashes = Path.Combine(_overview?.GameDir ?? "", "crash-reports");
+        try
+        {
+            var text = await Task.Run(() => ReadTail(Path.Combine(logs, "latest.log"), 200))
+                       ?? "Лог не найден: игра ещё не запускалась.";
+            LogText.Text = text;
+
+            var report = await Task.Run(() => NewestCrashReport(crashes));
+            if (string.IsNullOrWhiteSpace(report))
+            {
+                LogDiag.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var cause = DetectCrashCause(report);
+            LogDiag.Text = string.IsNullOrWhiteSpace(cause)
+                ? "Найдён краш-репорт, но причина не распознана. Полный файл: " +
+                  NewestCrashName(crashes)
+                : "Причина падения: " + cause;
+            LogDiag.Foreground = string.IsNullOrWhiteSpace(cause)
+                ? (Brush)FindResource("MutedBrush")
+                : (Brush)FindResource("DangerBrush");
+            LogDiag.Visibility = Visibility.Visible;
+        }
+        catch (Exception exc)
+        {
+            LogDiag.Text = "Не удалось прочитать лог: " + exc.Message;
+            LogDiag.Foreground = (Brush)FindResource("DangerBrush");
+            LogDiag.Visibility = Visibility.Visible;
+        }
+    }
+
+    /// <summary>Последние строки файла: целиком читать лог на десятки мегабайт незачем.</summary>
+    private static string? ReadTail(string path, int lines)
+    {
+        try
+        {
+            if (!File.Exists(path)) return null;
+            var all = File.ReadAllLines(path);
+            var take = Math.Min(lines, all.Length);
+            return string.Join(Environment.NewLine, all.Skip(all.Length - take)) + Environment.NewLine;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? NewestCrashReport(string folder)
+    {
+        try
+        {
+            if (!Directory.Exists(folder)) return null;
+            var file = new DirectoryInfo(folder).GetFiles("*.txt")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .FirstOrDefault();
+            return file is null ? null : File.ReadAllText(file.FullName);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? NewestCrashName(string folder)
+    {
+        try
+        {
+            if (!Directory.Exists(folder)) return "";
+            var file = new DirectoryInfo(folder).GetFiles("*.txt")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .FirstOrDefault();
+            return file?.Name ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    /// <summary>Ищет в краш-репорте знакомые формулировки и переводит их на человеческий.</summary>
+    private static string? DetectCrashCause(string report)
+    {
+        if (Regex.IsMatch(report, @"Duplicate mods|duplicate mod", RegexOptions.IgnoreCase))
+            return "в папке модов есть дубликат одного и того же мода";
+
+        if (Regex.IsMatch(report, @"Incompatible mods found|depends on .* which is missing|Missing or unsupported mandatory dependencies", RegexOptions.IgnoreCase))
+        {
+            var block = Regex.Match(report, @"Depends on [^
+]+".PadLeft(0));
+            return block.Success
+                ? "не хватает зависимости: " + block.Value
+                : "не хватает обязательного мода-зависимости";
+        }
+
+        if (Regex.IsMatch(report, @"java\.lang\.OutOfMemoryError", RegexOptions.IgnoreCase))
+            return "не хватило памяти — увеличьте объём в настройках";
+
+        if (Regex.IsMatch(report, @"NoClassDefFoundError|ClassNotFoundException", RegexOptions.IgnoreCase))
+        {
+            var match = Regex.Match(report, @"NoClassDefFoundError: ([^
+]+)|ClassNotFoundException: ([^
+]+)");
+            var name = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+            return "мод обращается к отсутствующему классу " + name.Trim();
+        }
+
+        if (Regex.IsMatch(report, @"GLFW error|Pixel format not accelerated|Failed to create GLFW window", RegexOptions.IgnoreCase))
+            return "видеодрайвер не может создать окно игры — обновите драйвер видеокарты";
+
+        if (Regex.IsMatch(report, @"Mixin apply failed|Mixin transformation.*failed", RegexOptions.IgnoreCase))
+            return "мод не смог примениться к коду игры (mixin) — обычно из-за несовместимой версии мода";
+
+        var exit = Regex.Match(report, @"Exit Code: (\-?\d+)");
+        if (exit.Success && exit.Groups[1].Value == "-1073741819")
+            return "доступ к памяти (0xC0000005) — чаще всего мод или драйвер видеокарты";
+
+        var line = Regex.Match(report, @"^Description: ([^\r\n]+)", RegexOptions.Multiline);
+        if (line.Success) return line.Groups[1].Value.Trim();
+
+        return null;
     }
 
     private void OnCopyServerClick(object sender, RoutedEventArgs e)
     {
         if (_overview is null) return;
-        try
+        var address = $"{_overview.ServerHost}:{_overview.ServerPort}";
+        if (TryCopyText(address))
         {
-            Clipboard.SetText($"{_overview.ServerHost}:{_overview.ServerPort}");
             Toast("Адрес сервера скопирован");
         }
-        catch
+        else
         {
-            // буфер обмена занят другим процессом — не критично
+            Toast("Буфер обмена занят другой программой. Попробуйте ещё раз.", true);
         }
     }
 
@@ -3580,6 +4522,11 @@ public partial class MainWindow : Window
         {
             var root = await _api.GetAsync("/api/mods/installed");
             var items = Models.ContentItems(root);
+            var problems = BuildModProblems(items);
+            var problemByProject = problems
+                .Where(p => !string.IsNullOrEmpty(p.ProjectId))
+                .GroupBy(p => p.ProjectId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Title, StringComparer.OrdinalIgnoreCase);
             _installed.Clear();
             var packIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var mod in (_overview?.PackModIds ?? new List<string>())) packIds.Add(mod);
@@ -3606,16 +4553,75 @@ public partial class MainWindow : Window
                     ToggleLabel = item.Disabled ? "Включить" : "Выключить",
                     CanToggle = !locked,
                     CanRemove = !locked && item.Removable,
+                    ProblemText = problemByProject.TryGetValue(item.ProjectId, out var why) ? why : "",
                     Data = item,
                 });
             }
+            var problemNote = problems.Count == 0
+                ? ""
+                : $" · проблем: {problems.Count}";
             InstalledHint.Text = $"Всего: {items.Count}"
-                                 + (_installedFilter == "all" ? "" : $" · показано: {_installed.Count}");
+                                 + (_installedFilter == "all" ? "" : $" · показано: {_installed.Count}")
+                                 + problemNote;
+            InstalledHint.ToolTip = problems.Count == 0
+                ? null
+                : string.Join("\n", problems.Select(p => "• " + p.Title + "\n   " + p.Detail));
+            InstalledHint.Foreground = problems.Any(p => p.Kind == "error")
+                ? (Brush)FindResource("DangerBrush")
+                : (Brush)FindResource("MutedBrush");
         }
         catch (Exception exc)
         {
             Toast("Не удалось прочитать контент: " + exc.Message, true);
         }
+    }
+
+    /// <summary>
+    /// Проверяет сборку на типичные проблемы: дубликаты по project_id,
+    /// моды, файл которых пропал с диска, и выключенные моды.
+    /// </summary>
+    private List<ModProblem> BuildModProblems(IReadOnlyList<ContentItem> items)
+    {
+        var problems = new List<ModProblem>();
+        var mods = items.Where(i => string.Equals(i.Kind, "mod", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        foreach (var group in mods.GroupBy(m => m.ProjectId, StringComparer.OrdinalIgnoreCase))
+        {
+            if (group.Count() > 1)
+            {
+                var names = string.Join(", ", group.Select(g => g.Filename));
+                problems.Add(new ModProblem
+                {
+                    Title = group.First().Title + " — установлен дважды",
+                    Detail = names,
+                    Kind = "error",
+                    ProjectId = group.Key,
+                });
+            }
+        }
+
+        var disabled = mods.Count(m => m.Disabled);
+        if (disabled > 0)
+        {
+            problems.Add(new ModProblem
+            {
+                Title = $"Выключенных модов: {disabled}",
+                Detail = "Если моды пропали из игры, проверьте, не отключены ли они.",
+                Kind = "warning",
+            });
+        }
+
+        if (mods.Count > 250)
+        {
+            problems.Add(new ModProblem
+            {
+                Title = $"Очень много модов: {mods.Count}",
+                Detail = "Больше 250 модов часто переполняет лимит загрузки Java.",
+                Kind = "warning",
+            });
+        }
+
+        return problems;
     }
 
     private static string KindName(string kind) => kind switch
@@ -3628,6 +4634,43 @@ public partial class MainWindow : Window
     };
 
     private async void OnReloadInstalledClick(object sender, RoutedEventArgs e) => await ReloadInstalledAsync();
+
+    private async void OnCheckUpdatesClick(object sender, RoutedEventArgs e)
+    {
+        if (_api is null) return;
+        var button = sender as Button;
+        if (button is not null) button.IsEnabled = false;
+        try
+        {
+            Toast("Проверяю обновления модов, это займёт до минуты...");
+            var root = await _api.GetAsync("/api/mods/updates");
+            var updates = root.ValueKind == JsonValueKind.Object
+                          && root.TryGetProperty("updates", out var arr) && arr.ValueKind == JsonValueKind.Array
+                ? arr.EnumerateArray().ToList()
+                : new List<JsonElement>();
+            if (updates.Count == 0)
+            {
+                Toast("Обновлений нет: все моды актуальны.");
+                return;
+            }
+
+            var names = string.Join(", ", updates
+                .Select(u => u.TryGetProperty("title", out var t) ? t.GetString() : "")
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Take(6));
+            var more = updates.Count > 6 ? $" и ещё {updates.Count - 6}" : "";
+            Toast($"Доступны обновления: {names}{more}. Нажмите «Обновить», чтобы поставить их.");
+        }
+        catch (Exception exc)
+        {
+            Toast("Не удалось проверить обновления: " + exc.Message, true);
+        }
+        finally
+        {
+            if (button is not null) button.IsEnabled = true;
+        }
+    }
+
     private async void OnFilterAllClick(object sender, RoutedEventArgs e) { _installedFilter = "all"; await ReloadInstalledAsync(); }
     private async void OnFilterModClick(object sender, RoutedEventArgs e) { _installedFilter = "mod"; await ReloadInstalledAsync(); }
     private async void OnFilterPackClick(object sender, RoutedEventArgs e) { _installedFilter = "pack"; await ReloadInstalledAsync(); }
@@ -3775,7 +4818,123 @@ public partial class MainWindow : Window
 
     private void OnProjectCloseClick(object sender, RoutedEventArgs e)
     {
-        ProjectPanel.Visibility = Visibility.Collapsed;
+        ProjectOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    // ---- Полноэкранный просмотр скриншотов ----
+
+    private System.Windows.Media.ImageSource? _photoSource;
+    private readonly List<System.Windows.Media.ImageSource> _photoList = new();
+    private int _photoIndex;
+
+    private void OnGalleryShotClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Border { Tag: System.Windows.Media.ImageSource shot }) return;
+        e.Handled = true;
+
+        // Собираем все уже загруженные кадры галереи, чтобы листать стрелками.
+        _photoList.Clear();
+        foreach (var child in ProjectGallery.Children)
+        {
+            if (child is Border { Tag: System.Windows.Media.ImageSource img }) _photoList.Add(img);
+        }
+        _photoIndex = Math.Max(0, _photoList.IndexOf(shot));
+        ShowPhotoAt(_photoIndex);
+        PhotoViewer.Visibility = Visibility.Visible;
+        PhotoViewer.Focus();
+    }
+
+    /// <summary>Показывает кадр по индексу со сбросом масштаба.</summary>
+    private void ShowPhotoAt(int index)
+    {
+        if (_photoList.Count == 0) return;
+        _photoIndex = ((index % _photoList.Count) + _photoList.Count) % _photoList.Count;
+        _photoSource = _photoList[_photoIndex];
+        _photoScale = 1.0;
+        PhotoViewerImage.Source = _photoSource;
+        PhotoZoom.ScaleX = 1;
+        PhotoZoom.ScaleY = 1;
+        PhotoViewerScroll.ScrollToHome();
+        if (PhotoCounter is not null)
+        {
+            PhotoCounter.Text = (_photoIndex + 1) + " / " + _photoList.Count;
+        }
+        var many = _photoList.Count > 1;
+        PhotoPrev.Visibility = many ? Visibility.Visible : Visibility.Collapsed;
+        PhotoNext.Visibility = many ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnPhotoPrevClick(object sender, RoutedEventArgs e) => ShowPhotoAt(_photoIndex - 1);
+
+    private void OnPhotoNextClick(object sender, RoutedEventArgs e) => ShowPhotoAt(_photoIndex + 1);
+
+    private void OnPhotoZoomIn(object sender, RoutedEventArgs e) => ZoomPhoto(1.25);
+
+    private void OnPhotoZoomOut(object sender, RoutedEventArgs e) => ZoomPhoto(0.8);
+
+    private double _photoScale = 1.0;
+
+    private void ZoomPhoto(double factor)
+    {
+        if (_photoSource is null) return;
+        _photoScale = Math.Clamp(_photoScale * factor, 0.2, 8.0);
+        PhotoZoom.ScaleX = _photoScale;
+        PhotoZoom.ScaleY = _photoScale;
+    }
+
+    private void OnPhotoZoomReset(object sender, RoutedEventArgs e)
+    {
+        if (_photoSource is null) return;
+        _photoScale = 1.0;
+        PhotoZoom.ScaleX = 1;
+        PhotoZoom.ScaleY = 1;
+        PhotoViewerScroll.ScrollToHome();
+    }
+
+    private void OnPhotoViewerClose(object sender, RoutedEventArgs e)
+    {
+        PhotoViewer.Visibility = Visibility.Collapsed;
+        PhotoViewerImage.Source = null;
+        _photoSource = null;
+    }
+
+    private void OnPhotoWheel(object sender, MouseWheelEventArgs e)
+    {
+        ZoomPhoto(e.Delta > 0 ? 1.15 : 0.87);
+        e.Handled = true;
+    }
+
+    private void OnPhotoKeyDown(object sender, KeyEventArgs e)
+    {
+        if (PhotoViewer.Visibility != Visibility.Visible) return;
+        switch (e.Key)
+        {
+            case Key.Escape:
+                OnPhotoViewerClose(this, new RoutedEventArgs());
+                e.Handled = true;
+                break;
+            case Key.Add:
+            case Key.OemPlus:
+                ZoomPhoto(1.15);
+                e.Handled = true;
+                break;
+            case Key.Subtract:
+            case Key.OemMinus:
+                ZoomPhoto(0.87);
+                e.Handled = true;
+                break;
+            case Key.Left:
+            case Key.PageUp:
+                ShowPhotoAt(_photoIndex - 1);
+                e.Handled = true;
+                break;
+            case Key.Right:
+            case Key.PageDown:
+            case Key.Space:
+                ShowPhotoAt(_photoIndex + 1);
+                e.Handled = true;
+                break;
+        }
     }
 
     private async void OnProjectInstallClick(object sender, RoutedEventArgs e)
@@ -3818,7 +4977,8 @@ public partial class MainWindow : Window
             BuildGallery(project);
             ProjectPanel.DataContext = card;
             ProjectPanel.Visibility = Visibility.Visible;
-            ProjectScroll.ScrollToTop();
+            ProjectOverlay.Visibility = Visibility.Visible;
+            ProjectOverlay.Focus();
             Toast(title);
         }
         catch (Exception exc)
@@ -3850,8 +5010,9 @@ public partial class MainWindow : Window
         foreach (var shot in frames)
         {
             var url = shot.ValueKind == JsonValueKind.String ? shot.GetString() : shot.Str("url");
-            var image = LoadImage(url);
-            if (image is null) continue;
+            if (string.IsNullOrWhiteSpace(url)) continue;
+
+            var picture = new Image { Stretch = Stretch.UniformToFill };
             var frame = new Border
             {
                 Width = 260,
@@ -3860,14 +5021,40 @@ public partial class MainWindow : Window
                 CornerRadius = new CornerRadius(10),
                 ClipToBounds = true,
                 Background = (Brush)FindResource("BgBrush"),
+                Child = picture,
+                Cursor = Cursors.Hand,
             };
-            var picture = new Image { Source = image, Stretch = Stretch.UniformToFill };
-            frame.Child = picture;
             ProjectGallery.Children.Add(frame);
+
+            // LoadImage грузит в фоне и первый раз отдаёт null: кадр добавляем сразу,
+            // картинку подставляем по завершении загрузки.
+            var immediate = LoadImage(url);
+            if (immediate is not null)
+            {
+                picture.Source = immediate;
+                frame.Tag = immediate;
+            }
+            else
+            {
+                _ = FillGalleryShotAsync(frame, picture, url);
+            }
+
+            frame.MouseLeftButtonUp += OnGalleryShotClick;
         }
         var hasShots = ProjectGallery.Children.Count > 0;
         ProjectGalleryHint.Visibility = hasShots ? Visibility.Visible : Visibility.Collapsed;
         ProjectGalleryScroll.Visibility = hasShots ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async Task FillGalleryShotAsync(Border frame, Image picture, string url)
+    {
+        var image = await LoadImageAsync(url);
+        if (image is null) return;
+        await Dispatcher.InvokeAsync(() =>
+        {
+            picture.Source = image;
+            frame.Tag = image;
+        });
     }
 
     private static string ChatErrorText(Exception exc)
@@ -3886,6 +5073,47 @@ public partial class MainWindow : Window
         Timeout = TimeSpan.FromSeconds(30),
     };
 
+    /// <summary>Папка дискового кэша картинок: второй запуск рисует иконки без сети.</summary>
+    private static string IconCacheDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Craftunity", "icons");
+
+    private static string IconCachePath(string url)
+    {
+        var key = url.Replace("https://", "").Replace("http://", "")
+            .Replace('/', '_').Replace(':', '_').Replace('?', '_').Replace('=', '_');
+        if (key.Length > 120) key = key[..120];
+        return Path.Combine(IconCacheDir, key + ".png");
+    }
+
+    /// <summary>Читает картинку с диска, если она уже скачивалась.</summary>
+    private static BitmapSource? LoadDiskImage(string url)
+    {
+        try
+        {
+            var path = IconCachePath(url);
+            if (!File.Exists(path)) return null;
+            return DecodeSkin(File.ReadAllBytes(path));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void SaveDiskImage(string url, byte[] bytes)
+    {
+        try
+        {
+            Directory.CreateDirectory(IconCacheDir);
+            File.WriteAllBytes(IconCachePath(url), bytes);
+        }
+        catch
+        {
+            // кэш не критичен
+        }
+    }
+
     private static ImageSource? LoadCachedImage(string? url)
     {
         var full = string.IsNullOrWhiteSpace(url) ? "" : url;
@@ -3893,8 +5121,14 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(full)) return null;
         lock (SkinCache)
         {
-            return SkinCache.TryGetValue(full, out var hit) ? hit : null;
+            if (SkinCache.TryGetValue(full, out var hit)) return hit;
         }
+        var disk = LoadDiskImage(full);
+        if (disk is not null)
+        {
+            lock (SkinCache) SkinCache[full] = disk;
+        }
+        return disk;
     }
 
     private static async Task<ImageSource?> LoadImageAsync(string? url)
@@ -3906,10 +5140,17 @@ public partial class MainWindow : Window
         {
             if (SkinCache.TryGetValue(full, out var hit)) return hit;
         }
+        var fromDisk = LoadDiskImage(full);
+        if (fromDisk is not null)
+        {
+            lock (SkinCache) SkinCache[full] = fromDisk;
+            return fromDisk;
+        }
         try
         {
             var bytes = await SkinHttp.GetByteArrayAsync(full).ConfigureAwait(false);
             var image = DecodeSkin(bytes);
+            if (image is not null) SaveDiskImage(full, bytes);
             lock (SkinCache) SkinCache[full] = image;
             return image;
         }
@@ -3939,9 +5180,17 @@ public partial class MainWindow : Window
             BitmapSource? image = null;
             try
             {
+                var diskVersion = LoadDiskImage(full);
+                if (diskVersion is not null)
+                {
+                    lock (SkinCache) SkinCache[full] = diskVersion;
+                    lock (SkinPending) SkinPending.Remove(full);
+                    return;
+                }
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
                 var bytes = await SkinHttp.GetByteArrayAsync(full, cts.Token).ConfigureAwait(false);
                 image = DecodeSkin(bytes);
+                if (image is not null) SaveDiskImage(full, bytes);
             }
             catch
             {
@@ -4054,6 +5303,90 @@ public partial class MainWindow : Window
         };
         if (dialog.ShowDialog(this) != true) return;
         _ = UploadContentFilesAsync(dialog.FileNames);
+    }
+
+    /// <summary>Тип контента по расширению: jar — мод, zip — ресурспак.</summary>
+    private static string ContentKindOf(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".jar" => "mod",
+            ".zip" => "resourcepack",
+            _ => "",
+        };
+    }
+
+    /// <summary>Папка шейдеров отличается тем, что внутри упаковки лежит shaders/.</summary>
+    private static bool LooksLikeShaderPack(string path)
+    {
+        try
+        {
+            using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+            return zip.Entries.Any(entry =>
+                entry.FullName.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string[] DroppedFiles(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return Array.Empty<string>();
+        return e.Data.GetData(DataFormats.FileDrop) as string[] ?? Array.Empty<string>();
+    }
+
+    private static string[] DroppedContentFiles(DragEventArgs e) =>
+        DroppedFiles(e).Where(p => ContentKindOf(p).Length > 0).ToArray();
+
+    private void OnWindowDragOver(object sender, DragEventArgs e)
+    {
+        var files = DroppedContentFiles(e);
+        e.Effects = files.Length > 0 ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnWindowDrop(object sender, DragEventArgs e)
+    {
+        var files = DroppedContentFiles(e);
+        e.Handled = true;
+        if (files.Length == 0)
+        {
+            Toast("Перетащите файл .jar (мод) или .zip (ресурспак)", true);
+            return;
+        }
+        if (_api is null)
+        {
+            Toast("Лаунчер ещё не подключён к движку", true);
+            return;
+        }
+
+        var mods = files.Where(p => ContentKindOf(p) == "mod").ToArray();
+        var zips = files.Where(p => ContentKindOf(p) == "resourcepack").ToArray();
+        var shaders = zips.Where(LooksLikeShaderPack).ToArray();
+        var packs = zips.Except(shaders).ToArray();
+
+        if (mods.Length > 0)
+        {
+            _kind = "mod";
+            await UploadContentFilesAsync(mods);
+        }
+        if (packs.Length > 0)
+        {
+            _kind = "resourcepack";
+            await UploadContentFilesAsync(packs);
+        }
+        if (shaders.Length > 0)
+        {
+            _kind = "shader";
+            await UploadContentFilesAsync(shaders);
+        }
+
+        // Перетаскивание — это действие на странице контента, покажем результат.
+        if (Nav.SelectedIndex != 2) Nav.SelectedIndex = 2;
+        await ReloadInstalledAsync();
     }
 
     private async Task UploadContentFilesAsync(IEnumerable<string> paths)
@@ -4497,7 +5830,17 @@ public partial class MainWindow : Window
         try
         {
             await _api.PostAsync("/api/account/logout", new { });
+            _profileShown = "";
+            _lastProfile = null;
+            ProfileAvatar.Source = null;
+            ProfileDeals.ItemsSource = null;
+            ProfileName.Text = "Аккаунт не выбран";
+            ProfileType.Text = "Войдите через ely.by или выберите оффлайн-ник";
+            OfflineName.Clear();
+            ElyLogin.Clear();
+            ElyPassword.Clear();
             await RefreshAsync();
+            SyncAccountPanels();
             Toast("Аккаунт отключён");
         }
         catch (Exception exc)
@@ -4523,34 +5866,38 @@ public partial class MainWindow : Window
 
     private async void OnThemeTileClick(object sender, RoutedEventArgs e)
     {
-        if (_api is null || sender is not Button { Tag: string theme }) return;
+        if (sender is not Button { Tag: string theme }) return;
+
+        ApplyTheme(theme);
+        Toast("Тема: " + Themes.Get(theme).Name);
+
+        if (_api is null) return;
         try
         {
             await _api.PostAsync("/api/settings", new { theme });
-            ApplyTheme(theme);
-            await RefreshAsync();
-            Toast("Тема: " + theme);
         }
         catch (Exception exc)
         {
-            Toast(exc.Message, true);
+            Toast("Тема применена, но не сохранена: " + exc.Message, true);
         }
     }
 
     private async void OnThemeToggleClick(object sender, RoutedEventArgs e)
     {
         var next = Themes.NextAfter(_overview?.Theme ?? "dark");
+
+        // Тема применяется сразу: интерфейс не ждёт бэкенда и не мигает.
+        ApplyTheme(next);
+        Toast("Тема: " + Themes.Get(next).Name);
+
         if (_api is null) return;
         try
         {
             await _api.PostAsync("/api/settings", new { theme = next });
-            ApplyTheme(next);
-            await RefreshAsync();
-            Toast("Тема: " + next);
         }
         catch (Exception exc)
         {
-            Toast(exc.Message, true);
+            Toast("Тема применена, но не сохранена: " + exc.Message, true);
         }
     }
 
