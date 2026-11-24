@@ -12,7 +12,7 @@ GITHUB_REPO = "daniprocrut-ui/craftunity"
 DEFAULT_MANIFEST_URL = "https://daniprocrut-ui.github.io/craftunity/manifest.json"
 DEFAULT_MANIFEST_SIG_URL = "https://raw.githubusercontent.com/daniprocrut-ui/craftunity/main/docs/manifest.json.sig"
 MANIFEST_REFRESH_SECONDS = 60
-HEARTBEAT_URL = "https://craftunity-heartbeat.netlify.app"
+HEARTBEAT_URL = "https://craftunity-heartbeat.daniprocrut-ui.workers.dev"
 LEGACY_MANIFEST_URLS = (
     "https://craftunity.mcsh.io/launcher/manifest.json",
     "https://daniprocrut-ui.github.io/craftunity/manifest.json",
